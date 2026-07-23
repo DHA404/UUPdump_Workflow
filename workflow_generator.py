@@ -110,6 +110,7 @@ I18N: Dict[str, Dict[str, Any]] = {
         "lang.current": "当前语言",
         "lang.zh": "中文",
         "lang.en": "English",
+        "lang.detected": "✔ 自动检测语言: {lang_name}",
         "lang.choose": "选择语言",
         # 消息
         "msg.success": "生成成功",
@@ -171,6 +172,7 @@ I18N: Dict[str, Dict[str, Any]] = {
         "lang.current": "Current language",
         "lang.zh": "Chinese",
         "lang.en": "English",
+        "lang.detected": "✔ Auto-detected language: {lang_name}",
         "lang.choose": "Choose language",
         "msg.success": "Generated successfully",
         "msg.failed": "Validation failed",
@@ -1003,6 +1005,65 @@ def action_switch_lang(i18n: I18n, console: Console) -> None:
 
 
 # ============================================================
+# detect_system_lang：自动检测系统语言
+# ============================================================
+def _parse_locale_to_lang(locale_str: str) -> Optional[str]:
+    """从 'zh_CN.UTF-8' / 'en_US' / 'zh' 等格式中提取 zh/en"""
+    if not locale_str:
+        return None
+    s = locale_str.strip().lower().replace("-", "_")
+    if s.startswith("zh"):
+        return "zh"
+    if s.startswith("en"):
+        return "en"
+    return None
+
+
+def _detect_from_env() -> Optional[str]:
+    """从 LC_ALL / LANG / LANGUAGE 环境变量检测（POSIX 标准）"""
+    for var in ("LC_ALL", "LANG", "LANGUAGE"):
+        v = os.environ.get(var, "")
+        if not v:
+            continue
+        # LANGUAGE 可能是冒号分隔的列表（如 zh_CN:en_US），取第一个
+        first = v.split(":")[0].strip()
+        result = _parse_locale_to_lang(first)
+        if result:
+            return result
+    return None
+
+
+def _detect_from_windows_api() -> Optional[str]:
+    """从 Windows API GetUserDefaultUILanguage 检测（仅 Windows）"""
+    if sys.platform != "win32":
+        return None
+    try:
+        import ctypes
+        windll = ctypes.windll.kernel32  # type: ignore[attr-defined]
+        lid = windll.GetUserDefaultUILanguage()
+        # 已知 LANG 标识：0x0804=zh-CN 0x0404=zh-TW 0x0C04=zh-HK 0x1004=zh-SG
+        if lid in (0x0804, 0x0404, 0x0C04, 0x1004):
+            return "zh"
+        # 0x0409=en-US 0x0809=en-GB 0x0C09=en-AU 0x1009=en-CA 等
+        if lid in (0x0409, 0x0809, 0x0C09, 0x1009, 0x040C, 0x080C, 0x0C0C):
+            return "en"
+        # 兜底：提取主语言号（LID 高 10 位）
+        primary = lid >> 10
+        if primary == 0x11:  # LANG_CHINESE
+            return "zh"
+        if primary == 0x09:  # LANG_ENGLISH
+            return "en"
+    except Exception:
+        pass
+    return None
+
+
+def detect_system_lang() -> Optional[str]:
+    """自动检测系统语言（按优先级：环境变量 → Windows API → None）"""
+    return _detect_from_env() or _detect_from_windows_api()
+
+
+# ============================================================
 # CLI 入口
 # ============================================================
 def parse_args() -> argparse.Namespace:
@@ -1011,27 +1072,49 @@ def parse_args() -> argparse.Namespace:
         description="工作流生成器 / Workflow Generator",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="示例 / Example:\n"
-               "  python workflow_generator.py             # 启动主菜单\n"
-               "  python workflow_generator.py --lang en   # 英文界面\n",
+               "  python workflow_generator.py                # 自动检测语言\n"
+               "  python workflow_generator.py --lang en      # 英文界面\n"
+               "  python workflow_generator.py --no-auto-lang # 关闭自动检测\n",
     )
     parser.add_argument(
         "--lang",
         choices=["zh", "en"],
-        default="zh",
-        help="界面语言 / Interface language (default: zh)",
+        default=None,  # 由 main 调用 detect_system_lang() 决定
+        help="界面语言 / Interface language (default: auto-detect)",
     )
     parser.add_argument(
         "--no-detect",
         action="store_true",
         help="跳过自动检测 UUP 脚本目录 / Skip auto-detect of UUP scripts",
     )
+    parser.add_argument(
+        "--no-auto-lang",
+        action="store_true",
+        help="关闭自动检测语言 / Disable auto-detect interface language",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
-    i18n = I18n(default=args.lang)
     console = Console()
+
+    # ── 自动检测语言（优先级：CLI 显式 > 环境变量 > Windows API > 兜底 zh）──
+    auto_used = False
+    if args.lang is None and not args.no_auto_lang:
+        detected = detect_system_lang()
+        if detected:
+            args.lang = detected
+            auto_used = True
+    if args.lang is None:
+        args.lang = "zh"  # 兜底中文
+
+    i18n = I18n(default=args.lang)
+
+    if auto_used:
+        lang_name = i18n.t_str(f"lang.{i18n.current()}")
+        msg = i18n.t_str("lang.detected").replace("{lang_name}", lang_name)
+        console.print(f"\n[bold green]{msg}[/bold green]\n")
 
     # ── 启动时检测本地 UUP 脚本 ──
     confirmed: Optional[ScriptInfo] = None

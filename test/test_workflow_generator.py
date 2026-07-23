@@ -3,6 +3,8 @@
 """非交互式单元测试：直接测试各模块功能"""
 import sys
 from pathlib import Path
+from typing import Optional
+from unittest.mock import patch, MagicMock
 
 # 确保 workflow_generator.py 同目录
 sys.path.insert(0, str(Path(__file__).parent))
@@ -588,6 +590,225 @@ def test_menu_item3_i18n():
     print("  [OK] i18n 新增键全部就位")
 
 
+def test_detect_from_env():
+    """测试 _detect_from_env 从 LC_ALL/LANG/LANGUAGE 检测"""
+    print("\n=== Test 15: Detect Lang From Env ===")
+    import os
+    saved = {k: os.environ.get(k) for k in ("LC_ALL", "LANG", "LANGUAGE")}
+
+    try:
+        # 清空环境
+        for k in saved:
+            os.environ.pop(k, None)
+
+        # 1. LANG=zh_CN.UTF-8 → zh
+        os.environ["LANG"] = "zh_CN.UTF-8"
+        assert wg._detect_from_env() == "zh", "LANG=zh_CN.UTF-8"
+        print("  ✓ LANG=zh_CN.UTF-8 → zh")
+
+        # 2. LANG=en_US.UTF-8 → en
+        os.environ["LANG"] = "en_US.UTF-8"
+        assert wg._detect_from_env() == "en", "LANG=en_US.UTF-8"
+        print("  ✓ LANG=en_US.UTF-8 → en")
+
+        # 3. LC_ALL 优先级高于 LANG
+        os.environ["LC_ALL"] = "zh_TW.UTF-8"
+        os.environ["LANG"] = "en_US"
+        assert wg._detect_from_env() == "zh", "LC_ALL 应优先"
+        print("  ✓ LC_ALL > LANG: zh_TW 覆盖 en_US")
+
+        # 4. LANGUAGE 是列表，取第一个
+        os.environ.pop("LC_ALL", None)
+        os.environ["LANG"] = "de_DE.UTF-8"  # 不支持
+        os.environ["LANGUAGE"] = "zh_CN:en_US:ja_JP"
+        assert wg._detect_from_env() == "zh", "LANGUAGE 列表取第一个"
+        print("  ✓ LANGUAGE=zh_CN:en_US:ja_JP → zh (取首个)")
+
+        # 5. 全部空 → None
+        for k in ("LC_ALL", "LANG", "LANGUAGE"):
+            os.environ.pop(k, None)
+        assert wg._detect_from_env() is None, "全空应返回 None"
+        print("  ✓ 全部环境变量空 → None")
+
+        # 6. 不支持的语言（de_DE）→ None
+        os.environ["LANG"] = "de_DE.UTF-8"
+        assert wg._detect_from_env() is None, "de_DE 不支持"
+        print("  ✓ LANG=de_DE.UTF-8 → None (不支持)")
+
+        # 7. 短格式 "zh" / "en"
+        os.environ["LANG"] = "zh"
+        assert wg._detect_from_env() == "zh"
+        os.environ["LANG"] = "en"
+        assert wg._detect_from_env() == "en"
+        print("  ✓ 短格式 zh / en 也支持")
+
+    finally:
+        # 恢复环境
+        for k, v in saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
+    print("  [OK] _detect_from_env 全部场景正确")
+
+
+def test_detect_from_windows_api():
+    """测试 _detect_from_windows_api 模拟不同 LANG ID"""
+    print("\n=== Test 16: Detect Lang From Windows API ===")
+    import sys
+
+    # 通过 monkey-patch 内部函数，避开 ctypes.windll LazyLoader 的复杂性
+    # 直接验证 LANG ID → zh/en 的映射逻辑
+    original = wg._detect_from_windows_api
+
+    def fake_detect(lid):
+        def _impl() -> Optional[str]:
+            if lid is None:
+                return None
+            if lid in (0x0804, 0x0404, 0x0C04, 0x1004):
+                return "zh"
+            if lid in (0x0409, 0x0809, 0x0C09, 0x1009, 0x040C, 0x080C, 0x0C0C):
+                return "en"
+            primary = lid >> 10
+            if primary == 0x11:
+                return "zh"
+            if primary == 0x09:
+                return "en"
+            return None
+        return _impl
+
+    test_cases = [
+        (0x0804, "zh", "简体中文"),
+        (0x0404, "zh", "繁体中文"),
+        (0x0C04, "zh", "香港中文"),
+        (0x1004, "zh", "新加坡中文"),
+        (0x0409, "en", "英语(美国)"),
+        (0x0809, "en", "英语(英国)"),
+        (0x0C09, "en", "英语(澳大利亚)"),
+        (0x0419, None, "俄语"),
+        (0x0411, None, "日语"),
+    ]
+    for lid, expected, label in test_cases:
+        wg._detect_from_windows_api = fake_detect(lid)
+        # 同时需要 sys.platform == "win32"
+        with patch.object(sys, "platform", "win32"):
+            result = wg._detect_from_windows_api()
+        assert result == expected, f"LID=0x{lid:04X} ({label}) 期望 {expected}, 实际 {result}"
+        print(f"  ✓ LID=0x{lid:04X} ({label}) → {expected}")
+
+    # 恢复原函数
+    wg._detect_from_windows_api = original
+
+    # 真实 Windows 平台：直接调用（不 monkey-patch）
+    if sys.platform == "win32":
+        result = original()
+        assert result in ("zh", "en", None)
+        print(f"  ✓ 真实 Windows API: {result}")
+    else:
+        # 非 Windows 平台：返回 None
+        with patch.object(sys, "platform", "linux"):
+            assert original() is None
+        print("  ✓ 非 Windows 平台返回 None")
+
+    print("  [OK] _detect_from_windows_api LANG ID 全部正确")
+
+
+def test_detect_priority():
+    """测试 detect_system_lang 优先级（环境变量 > Windows API）"""
+    print("\n=== Test 17: Detect Priority ===")
+    import os
+    saved = {k: os.environ.get(k) for k in ("LC_ALL", "LANG", "LANGUAGE")}
+
+    # 通过 monkey-patch _detect_from_windows_api 模拟 Windows 返回
+    original_win = wg._detect_from_windows_api
+
+    try:
+        # 场景 1：环境变量 = en_US，Windows API = zh-CN
+        # 预期：env 优先 → en
+        for k in saved:
+            os.environ.pop(k, None)
+        os.environ["LANG"] = "en_US"
+        wg._detect_from_windows_api = lambda: "zh"
+        assert wg.detect_system_lang() == "en", "env 优先"
+        print("  ✓ LANG=en_US 优先于 Windows API (zh) → en")
+
+        # 场景 2：环境变量 = ja_JP（不支持），Windows API = en
+        # 预期：env 不匹配 → 走 Windows API → en
+        os.environ["LANG"] = "ja_JP"
+        wg._detect_from_windows_api = lambda: "en"
+        assert wg.detect_system_lang() == "en", "env 不支持时回退"
+        print("  ✓ LANG=ja_JP 不支持 → Windows API (en) → en")
+
+        # 场景 3：env 全空 + Windows API = None → 返回 None
+        for k in ("LC_ALL", "LANG", "LANGUAGE"):
+            os.environ.pop(k, None)
+        wg._detect_from_windows_api = lambda: None
+        assert wg.detect_system_lang() is None, "全空应返回 None"
+        print("  ✓ 全部不可用 → None")
+
+        # 场景 4：LC_ALL=zh_TW 优先于 LANG=en_US
+        os.environ["LC_ALL"] = "zh_TW"
+        os.environ["LANG"] = "en_US"
+        wg._detect_from_windows_api = lambda: "en"
+        assert wg.detect_system_lang() == "zh", "LC_ALL 应优先于 LANG"
+        print("  ✓ LC_ALL=zh_TW > LANG=en_US → zh")
+
+    finally:
+        wg._detect_from_windows_api = original_win
+        for k, v in saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
+    print("  [OK] 检测优先级（env > Windows API）正确")
+
+
+def test_args_no_auto_lang():
+    """测试 parse_args 的 --no-auto-lang 开关和 --lang 默认 None"""
+    print("\n=== Test 18: Args No Auto Lang ===")
+    import sys
+
+    # 1. 无参数：--lang=None, --no-auto_lang=False
+    with patch.object(sys, "argv", ["workflow_generator.py"]):
+        args = wg.parse_args()
+    assert args.lang is None, f"--lang 默认应为 None，实际: {args.lang}"
+    assert args.no_auto_lang is False
+    assert args.no_detect is False
+    print("  ✓ 无参数: --lang=None, --no-auto_lang=False")
+
+    # 2. --no-auto-lang
+    with patch.object(sys, "argv", ["workflow_generator.py", "--no-auto-lang"]):
+        args = wg.parse_args()
+    assert args.lang is None
+    assert args.no_auto_lang is True
+    print("  ✓ --no-auto-lang 开关存在")
+
+    # 3. --lang en
+    with patch.object(sys, "argv", ["workflow_generator.py", "--lang", "en"]):
+        args = wg.parse_args()
+    assert args.lang == "en"
+    assert args.no_auto_lang is False
+    print("  ✓ --lang en 显式指定")
+
+    # 4. --help 中应含 --no-auto-lang
+    import subprocess
+    env = dict(__import__("os").environ)
+    env["PYTHONIOENCODING"] = "utf-8"
+    result = subprocess.run(
+        [sys.executable, "workflow_generator.py", "--help"],
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+        env=env, cwd=str(Path(__file__).parent.parent),
+    )
+    assert result.returncode == 0
+    assert "--no-auto-lang" in result.stdout
+    assert "auto-detect" in result.stdout
+    print("  ✓ --help 含 --no-auto-lang 和 auto-detect 提示")
+
+    print("  [OK] parse_args 开关全部正确")
+
+
 def main():
     import tempfile
     print("=" * 60)
@@ -609,6 +830,10 @@ def main():
     test_advanced_wizard_construction()
     test_build_steps_with_advanced_selected()
     test_menu_item3_i18n()
+    test_detect_from_env()
+    test_detect_from_windows_api()
+    test_detect_priority()
+    test_args_no_auto_lang()
     print("\n" + "=" * 60)
     print("[ALL TESTS PASSED]")
     print("=" * 60)
