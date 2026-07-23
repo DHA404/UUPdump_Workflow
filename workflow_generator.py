@@ -239,12 +239,12 @@ class ScriptInfo:
 
 
 # ============================================================
-# ScriptDetector：扫描 UUPdump script/ 目录，正则提取元数据
+# ScriptDetector：扫描 UUPdump_script/ 目录，正则提取元数据
 # ============================================================
 class ScriptDetector:
-    """扫描 `UUPdump script/` 下的一层子目录，正则提取 build/Windows 版本/架构"""
+    """扫描 `UUPdump_script/` 下的一层子目录，正则提取 build/Windows 版本/架构"""
 
-    BASE_DIR = Path("UUPdump script")
+    BASE_DIR = Path("UUPdump_script")
     # 5-6 位数字 . 4-5 位数字（用 lookaround 替代 \b，避免与下划线冲突）
     BUILD_RE = re.compile(r"(?:^|(?<=[^.\d]))(\d{5,}\.\d{4,})(?=[^.\d]|$)")
     # Windows10 / Windows11
@@ -604,7 +604,7 @@ class UUPWizard:
             "Build_VERSION": version,
             "FILE_NAME": name,
         }
-        # UUP_DIR：检测到 UUPdump script/ 时填嵌套路径，否则 fallback 到 FILE_NAME
+        # UUP_DIR：检测到 UUPdump_script/ 时填嵌套路径，否则 fallback 到 FILE_NAME
         # （保持与 .example/UUPdumpWinISO-main 一致的目录约定）
         if self._uup_dir:
             env["UUP_DIR"] = self._uup_dir
@@ -967,10 +967,10 @@ def action_generate(
     advanced: bool = False,
 ) -> None:
     """主菜单项 1：进入 UUP 向导生成 yml"""
-    # 构造 UUP_DIR：检测到 UUPdump script/ 时填嵌套路径，否则保持 None（fallback 到 FILE_NAME）
+    # 构造 UUP_DIR：检测到 UUPdump_script/ 时填嵌套路径，否则保持 None（fallback 到 FILE_NAME）
     uup_dir: Optional[str] = None
     if confirmed and confirmed.dir_name:
-        uup_dir = str(Path("UUPdump script") / confirmed.dir_name)
+        uup_dir = (Path("UUPdump_script") / confirmed.dir_name).as_posix()
     wizard = UUPWizard(
         i18n,
         console,

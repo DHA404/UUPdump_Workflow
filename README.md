@@ -38,7 +38,7 @@
 - 🌐 **中英双语 + 自动检测** —— 启动时按 `LC_ALL` / `LANG` / `LANGUAGE` / Windows API 自动判断；可显式覆盖或关闭
 - 🎨 **彩色终端 UI** —— 基于 [rich](https://github.com/Textualize/rich) 库，Panel / Box / 颜色自适应
 - 🧙 **5 步交互式向导** —— 仿 [UUPdumpWinISO](https://github.com/UUPdumpWinISO) 真实工作流步骤
-- 🔍 **启动时自动检测 UUP 脚本** —— 扫描 `UUPdump script/`，单选后自动填充版本信息
+- 🔍 **启动时自动检测 UUP 脚本** —— 扫描 `UUPdump_script/`，单选后自动填充版本信息
 - 🗺️ **Build 映射表** —— 内置 Win10 / Win11 / Windows Server 全部 build → 版本名映射（缺映射时自动回退兜底）
 - ⚙️ **高级选项 / 步骤选择器** —— 6 个内置步骤模板，可多选 + 排序 + 自定义步骤，不选走默认 4 步序列
 - ✅ **语法验证** —— PyYAML 反向解析，自动检查 yml 语法
@@ -91,7 +91,7 @@ python workflow_generator.py
 | 参数 | 默认 | 说明 |
 |------|------|------|
 | `--lang {zh,en}` | **自动检测** | 强制界面语言（覆盖自动检测） |
-| `--no-detect` | 关闭 | 跳过启动时自动扫描 `UUPdump script/` |
+| `--no-detect` | 关闭 | 跳过启动时自动扫描 `UUPdump_script/` |
 | `--no-auto-lang` | 关闭 | 关闭自动检测语言（回退到 zh） |
 | `-h` / `--help` | — | 显示帮助信息 |
 
@@ -194,7 +194,7 @@ python workflow_generator.py --no-auto-lang
 
 ## 🔍 启动时自动检测脚本 / Startup Auto-Detect
 
-每次启动时（如未指定 `--no-detect`），工具自动扫描 `UUPdump script/` 下的子目录，从目录名提取元数据：
+每次启动时（如未指定 `--no-detect`），工具自动扫描 `UUPdump_script/` 下的子目录，从目录名提取元数据：
 
 - **Build 编号**（正则 `26200\.8968`）
 - **Windows 版本 + 补丁代号**（如 `Windows11` / `25H2`）
@@ -217,7 +217,7 @@ python workflow_generator.py --no-auto-lang
 | 变量 | 含义 | 示例（检测到上述脚本时） |
 |------|------|------------------------|
 | `FILE_NAME` | 产物名基础（artifact / Release / 7z 输出） | `Windows11_25H2_amd64` |
-| `UUP_DIR` | UUP 脚本目录的相对路径 | `UUPdump script/26200.8968_amd64_zh-cn_professional_6b4cc4c9_convert_virtual` |
+| `UUP_DIR` | UUP 脚本目录的相对路径 | `UUPdump_script/26200.8968_amd64_zh-cn_professional_6b4cc4c9_convert_virtual` |
 
 - `cd` 和 7z 步骤自动使用 `UUP_DIR` 引用脚本目录
 - artifact / Release 名仍使用 `FILE_NAME`，与脚本目录名解耦
@@ -290,7 +290,7 @@ jobs:
     env:
       Build_VERSION: '26200.8968'
       FILE_NAME: Windows11_25H2_amd64
-      UUP_DIR: UUPdump script/26200.8968_amd64_zh-cn_professional_6b4cc4c9_convert_virtual
+      UUP_DIR: UUPdump_script/26200.8968_amd64_zh-cn_professional_6b4cc4c9_convert_virtual
     timeout-minutes: 360
     steps:
     - name: Checkout
@@ -311,7 +311,7 @@ jobs:
 
 > `shell: cmd` 与 `-mx=9` 与 `.example/UUPdumpWinISO-main` 真实工作流保持一致：CMD 显式声明确保 `.cmd` 脚本被正确执行；最高压缩级别减小 artifact 体积。
 >
-> `UUP_DIR` 与 `FILE_NAME` 解耦：`FILE_NAME` 控制产物命名（artifact / Release / 7z 输出），`UUP_DIR` 指向 UUP 脚本目录。当自动检测到 `UUPdump script/<dir_name>/` 时，`UUP_DIR` 填嵌套路径；否则与 `FILE_NAME` 同名。
+> `UUP_DIR` 与 `FILE_NAME` 解耦：`FILE_NAME` 控制产物命名（artifact / Release / 7z 输出），`UUP_DIR` 指向 UUP 脚本目录。当自动检测到 `UUPdump_script/<dir_name>/` 时，`UUP_DIR` 填嵌套路径；否则与 `FILE_NAME` 同名。
 
 ## ▶️ 运行工作流教程 / Run the Workflow
 
@@ -335,10 +335,10 @@ jobs:
 2. 右上角点 "Fork" 按钮 → 选自己的账号
 3. 本地克隆自己的 fork：
    git clone https://github.com/<user>/UUPdump_Workflow.git
-4. 把生成的 yml 放进 .github/workflows/、UUP 脚本放进 UUPdump script/
+4. 把生成的 yml 放进 .github/workflows/、UUP 脚本放进 UUPdump_script/
 5. 提交并推送：
    git add .github/workflows/<name>.yml
-   git add "UUPdump script/<dirname>"
+   git add "UUPdump_script/<dirname>"
    git commit -m "Add UUP workflow for <name>"
    git push
 ```
@@ -435,7 +435,7 @@ UUPdump_Workflow/
 ├── .github/
 │   └── workflows/                 # 生成的工作流输出目录
 │       └── Windows11_25H2_amd64.yml
-├── UUPdump script/                # 待打包的 UUP 脚本目录（启动时自动扫描）
+├── UUPdump_script/                # 待打包的 UUP 脚本目录（启动时自动扫描）
 │   └── 26200.8968_amd64_zh-cn_professional_6b4cc4c9_convert_virtual/
 └── .example/                      # 参考项目（不影响主程序）
     └── UUPdumpWinISO-main/        # 真实 GitHub Actions 模板
@@ -459,7 +459,7 @@ UUPdump_Workflow/
 | 12 | Build 不在映射表内？ | 自动回退到 `Windows_<build>_<arch>` 格式兜底命名；可在 [build_mapping.py](build_mapping.py) 补全 |
 | 13 | 高级选项怎么用？ | 主菜单按 `[3]` 开启 → 进入 `[1]` 向导第 0 步多选步骤模板 |
 | 14 | 自定义步骤支持什么？ | 任意 `name` / `uses` / `run` / `shell` 组合（`uses` 和 `run` 至少填一个） |
-| 15 | 报 `The system cannot find the path specified`？ | `UUP_DIR` 未正确指向脚本目录：检查 `env.UUP_DIR` 是否等于 `UUPdump script/<dir_name>`；手改 yml 时请保持同步 |
+| 15 | 报 `The system cannot find the path specified`？ | `UUP_DIR` 未正确指向脚本目录：检查 `env.UUP_DIR` 是否等于 `UUPdump_script/<dir_name>`；手改 yml 时请保持同步 |
 | 16 | 7z 步骤找不到 `*.iso`？ | ISO 在 `${{ env.UUP_DIR }}` 目录下，7z 输入路径已自动使用 `UUP_DIR`；手改 yml 时请保持同步 |
 
 ## ⚠️ 限制 / Limitations

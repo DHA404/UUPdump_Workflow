@@ -6,7 +6,7 @@ jobs:
     env:
       Build_VERSION: '26200.8968'
       FILE_NAME: Windows11_25H2_amd64
-      UUP_DIR: UUPdump script\26200.8968_amd64_zh-cn_professional_6b4cc4c9_convert_virtual
+      UUP_DIR: UUPdump_script/26200.8968_amd64_zh-cn_professional_6b4cc4c9_convert_virtual
     timeout-minutes: 360
     steps:
     - name: Checkout

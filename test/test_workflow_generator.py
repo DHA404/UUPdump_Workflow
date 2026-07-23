@@ -247,7 +247,7 @@ def test_script_detector(tmp_path):
     import tempfile
 
     with tempfile.TemporaryDirectory() as tmp:
-        base = Path(tmp) / "UUPdump script"
+        base = Path(tmp) / "UUPdump_script"
         base.mkdir()
 
         # 测试用例
@@ -307,9 +307,9 @@ def test_script_detector(tmp_path):
     print("  ✓ 不存在目录返回空")
 
     # 正常 BASE_DIR（项目当前实际为空）
-    real = wg.ScriptDetector(base=Path("UUPdump script")).scan()
+    real = wg.ScriptDetector(base=Path("UUPdump_script")).scan()
     assert isinstance(real, list)
-    print(f"  ✓ 真实 UUPdump script/ 目录扫描返回 {len(real)} 项")
+    print(f"  ✓ 真实 UUPdump_script/ 目录扫描返回 {len(real)} 项")
     print("  [OK] ScriptDetector 正则提取全部正确")
 
 
@@ -413,7 +413,7 @@ def test_build_mapping():
     import tempfile
     from pathlib import Path
     with tempfile.TemporaryDirectory() as tmp:
-        base = Path(tmp) / "UUPdump script"
+        base = Path(tmp) / "UUPdump_script"
         base.mkdir()
         # 测试目录：有 build 映射
         d1 = base / "26200.8968_amd64_zh-cn_professional"
@@ -836,7 +836,7 @@ def test_yml_builder_with_uup_dir():
         env={
             "Build_VERSION": "26200.8968",
             "FILE_NAME": "Windows11_25H2_amd64",
-            "UUP_DIR": "UUPdump script/26200.8968_amd64_zh-cn_professional_6b4cc4c9_convert_virtual",
+            "UUP_DIR": "UUPdump_script/26200.8968_amd64_zh-cn_professional_6b4cc4c9_convert_virtual",
         },
         timeout=360,
     )
@@ -844,7 +844,7 @@ def test_yml_builder_with_uup_dir():
     parsed = yaml.safe_load(b.to_yaml())
     env = parsed["jobs"]["build"]["env"]
     assert "UUP_DIR" in env, "UUP_DIR env 缺失"
-    assert env["UUP_DIR"].startswith("UUPdump script/"), f"UUP_DIR 应指向脚本目录: {env['UUP_DIR']}"
+    assert env["UUP_DIR"].startswith("UUPdump_script/"), f"UUP_DIR 应指向脚本目录: {env['UUP_DIR']}"
     steps = parsed["jobs"]["build"]["steps"]
     build_step = next(s for s in steps if s["name"] == "Build ISO")
     assert "UUP_DIR" in build_step["run"], "cd 步骤必须使用 UUP_DIR"
@@ -886,13 +886,13 @@ def test_wizard_uup_dir_fallback():
     assert env["UUP_DIR"] == "Win11", f"fallback 失败: {env['UUP_DIR']}"
 
     # 传 uup_dir 时应使用
-    wiz2 = wg.UUPWizard(i18n, console, default_name="Win11", uup_dir="UUPdump script/foo")
+    wiz2 = wg.UUPWizard(i18n, console, default_name="Win11", uup_dir="UUPdump_script/foo")
     env2: dict = {"Build_VERSION": "26200.1", "FILE_NAME": "Win11"}
     if wiz2._uup_dir:
         env2["UUP_DIR"] = wiz2._uup_dir
     else:
         env2["UUP_DIR"] = "Win11"
-    assert env2["UUP_DIR"] == "UUPdump script/foo", f"传参未生效: {env2['UUP_DIR']}"
+    assert env2["UUP_DIR"] == "UUPdump_script/foo", f"传参未生效: {env2['UUP_DIR']}"
     print("  [OK] UUPWizard uup_dir fallback + 传参均正确")
 
 
