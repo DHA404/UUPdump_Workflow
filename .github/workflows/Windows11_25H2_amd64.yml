@@ -11,11 +11,12 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v5
     - name: Build ISO
+      shell: cmd
       run: 'cd "${{ env.FILE_NAME }}"
 
         uup_download_windows.cmd'
     - name: Package
-      run: 7z a -v1950m "${{ env.FILE_NAME }}-${{ env.Build_VERSION }}.7z" "./${{ env.FILE_NAME }}/*.iso"
+      run: 7z a -v1950m "${{ env.FILE_NAME }}-${{ env.Build_VERSION }}.7z" "./${{ env.FILE_NAME }}/*.iso" -mx=9
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:

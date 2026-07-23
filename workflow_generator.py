@@ -75,6 +75,21 @@ I18N: Dict[str, Dict[str, Any]] = {
         "wizard.timeout": "超时（分钟）",
         "wizard.timeout.help": "UUP 下载+ISO 转换通常需要 1-3 小时\n默认 360 分钟（6 小时）",
         "wizard.release": "发布方式",
+        # 高级选项 - 菜单
+        "menu.item3": "[3] 高级选项（当前：{state}）",
+        "menu.state.on": "开启",
+        "menu.state.off": "关闭",
+        "menu.toggle_on": "✔ 高级选项: 开启",
+        "menu.toggle_off": "✔ 高级选项: 关闭",
+        # 高级选项 - 步骤选择器
+        "wizard.steps": "步骤选择器",
+        "wizard.steps.help": "多选步骤模板并调整顺序\n输入 0 跳过（使用默认 4 步）",
+        "wizard.steps.reorder": "调整顺序（直接回车保持当前顺序）",
+        "wizard.steps.custom.name": "自定义步骤名称",
+        "wizard.steps.custom.uses": "`uses:` 字段（可留空）",
+        "wizard.steps.custom.run": "`run:` 字段（可留空）",
+        "wizard.steps.custom.shell": "`shell:` 字段（默认 cmd）",
+        "wizard.steps.selected": "已选步骤",
         # 检测
         "detect.title": "检测到 UUP 脚本",
         "detect.choose": "选择要使用的脚本（【0】跳过）",
@@ -123,6 +138,21 @@ I18N: Dict[str, Dict[str, Any]] = {
         "wizard.timeout": "Timeout (minutes)",
         "wizard.timeout.help": "UUP download+ISO conversion takes 1-3 hours\nDefault 360 min (6 hours)",
         "wizard.release": "Release type",
+        # Advanced options - menu
+        "menu.item3": "[3] Advanced Options (currently: {state})",
+        "menu.state.on": "ON",
+        "menu.state.off": "OFF",
+        "menu.toggle_on": "✔ Advanced Options: ON",
+        "menu.toggle_off": "✔ Advanced Options: OFF",
+        # Advanced options - step selector
+        "wizard.steps": "Step Selector",
+        "wizard.steps.help": "Multi-select step templates and reorder\nEnter 0 to skip (use default 4 steps)",
+        "wizard.steps.reorder": "Reorder (Enter to keep current order)",
+        "wizard.steps.custom.name": "Custom step name",
+        "wizard.steps.custom.uses": "`uses:` field (can be empty)",
+        "wizard.steps.custom.run": "`run:` field (can be empty)",
+        "wizard.steps.custom.shell": "`shell:` field (default cmd)",
+        "wizard.steps.selected": "Selected steps",
         # 检测
         "detect.title": "Detected UUP scripts",
         "detect.choose": "Choose a script to use ([0] skip)",
@@ -308,6 +338,76 @@ class ScriptDetector:
 
 
 # ============================================================
+# StepTemplate：步骤模板，供「高级选项」中的步骤选择器使用
+# ============================================================
+@dataclass
+class StepTemplate:
+    """6 个内置 GitHub Actions 步骤模板之一（高级模式用）"""
+    id: str                                # 模板 id（英文）
+    name: str                              # 显示名（中文）
+    description: str                       # 详细说明
+    default_order: int                     # 在推荐序列中的默认位置
+
+    def render(self) -> Dict[str, Any]:
+        """渲染为 step dict（占位符为字面量 ${{ env.* }}）"""
+        if self.id == "checkout":
+            return {"name": "Checkout", "uses": "actions/checkout@v5"}
+        if self.id == "build":
+            return {
+                "name": "Build ISO",
+                "shell": "cmd",
+                "run": (
+                    'cd "${{ env.FILE_NAME }}"\n'
+                    "uup_download_windows.cmd"
+                ),
+            }
+        if self.id == "package":
+            return {
+                "name": "Package",
+                "run": (
+                    '7z a -v1950m "${{ env.FILE_NAME }}-'
+                    '${{ env.Build_VERSION }}.7z" '
+                    '"./${{ env.FILE_NAME }}/*.iso"'
+                    ' -mx=9'
+                ),
+            }
+        if self.id == "upload":
+            return {
+                "name": "Upload artifact",
+                "uses": "actions/upload-artifact@v4",
+                "with": {
+                    "name": "${{ env.FILE_NAME }}-${{ env.Build_VERSION }}",
+                    "path": "${{ env.FILE_NAME }}-${{ env.Build_VERSION }}.7z*",
+                },
+            }
+        if self.id == "release":
+            return {
+                "name": "Release",
+                "uses": "softprops/action-gh-release@v2",
+                "with": {
+                    "tag_name": "${{ env.FILE_NAME }}-${{ env.Build_VERSION }}",
+                    "files": "${{ env.FILE_NAME }}-${{ env.Build_VERSION }}.7z*",
+                },
+            }
+        if self.id == "custom":
+            # custom 模板在 ask_user 阶段收集后渲染，不走 render
+            raise NotImplementedError("custom 模板需在 ask_user 中预渲染")
+        raise ValueError(f"未知模板 id: {self.id}")
+
+    @staticmethod
+    def all() -> List["StepTemplate"]:
+        """返回 6 个内置模板"""
+        return [
+            StepTemplate("checkout", "拉取代码", "actions/checkout@v5", 1),
+            StepTemplate("build",    "构建 ISO", "shell: cmd + uup_download_windows.cmd", 2),
+            StepTemplate("package",  "7z 分卷压缩", "7z a -v1950m ... -mx=9", 3),
+            StepTemplate("upload",   "上传工作流产物", "actions/upload-artifact@v4", 4),
+            StepTemplate("release",  "发布到 GitHub Release", "softprops/action-gh-release@v2", 5),
+            StepTemplate("custom",   "自定义步骤", "手动输入 uses / run / shell", 6),
+        ]
+
+
+# ============================================================
 # YmlBuilder 类：yml 数据结构构建器
 # ============================================================
 class YmlBuilder:
@@ -410,6 +510,7 @@ class UUPWizard:
         console: Console,
         default_name: Optional[str] = None,
         default_build: Optional[str] = None,
+        advanced: bool = False,
     ) -> None:
         self.i18n = i18n
         self.console = console
@@ -419,10 +520,21 @@ class UUPWizard:
         # 是否检测到非默认信息（用于决定是否显示"检测到的信息"行）
         self._has_detected_name = default_name is not None
         self._has_detected_build = default_build is not None
+        # 高级选项：用户开启时，向导第 0 步插入步骤选择器
+        self.advanced = advanced
+        # 步骤选择器的结果（None = 用默认 4 步序列）
+        self._selected_steps: Optional[List[Any]] = None
 
     def run(self) -> Optional[YmlBuilder]:
         """执行 5 步引导式问答，返回 YmlBuilder 或 None（用户取消）"""
         builder = YmlBuilder()
+
+        # ── 第 0 步（仅高级模式）：步骤选择器 ──
+        if self.advanced:
+            self._selected_steps = self._ask_step_selector()
+            # None = 用户跳过，走默认 4 步序列
+            if not self._selected_steps:
+                self._selected_steps = None
 
         # ── 第一步：工作流名称 ──
         self.console.print(
@@ -504,7 +616,12 @@ class UUPWizard:
         return builder
 
     def _build_steps(self, release_idx: int) -> List[Dict[str, Any]]:
-        """构造固定的 UUP 构建步骤列表"""
+        """构造步骤列表：高级模式用用户选择，否则用默认 4 步固定序列"""
+        # 高级模式 + 用户已选步骤 → 用用户选择的模板
+        if self.advanced and self._selected_steps:
+            return [t.render() if hasattr(t, "render") else t for t in self._selected_steps]
+
+        # 默认 4 步固定序列（保持现有行为）
         steps: List[Dict[str, Any]] = [
             {
                 "name": "Checkout",
@@ -558,6 +675,145 @@ class UUPWizard:
             })
         # release_idx == 2: 不自动上传，steps 仅到 Package
         return steps
+
+    def _ask_step_selector(self) -> Optional[List[Any]]:
+        """高级模式第 0 步：6 模板多选 + 排序
+
+        返回：有序的 StepTemplate 列表（含 custom 模板的预渲染 dict）
+              或 None（用户输入 0/空 跳过，走默认 4 步序列）
+        """
+        templates = StepTemplate.all()
+        # ── 1. 显示模板清单 ──
+        self.console.print(
+            f"\n[bold cyan]──── {self.i18n.t_str('wizard.steps')} (0/?) ────[/bold cyan]"
+        )
+        self.console.print(f"[dim]{self.i18n.t_str('wizard.steps.help')}[/dim]")
+        for i, t in enumerate(templates, 1):
+            self.console.print(
+                f"  [cyan][[{i}]][/cyan] [bold]{t.name}[/bold]  "
+                f"[dim]— {t.description}[/dim]"
+            )
+
+        # ── 2. 多选 ──
+        try:
+            raw = Prompt.ask(
+                "  >",
+                default="0",
+            ).strip()
+        except (EOFError, KeyboardInterrupt):
+            return None
+
+        if not raw or raw == "0":
+            return None  # 跳过
+
+        # 解析：支持空格、逗号、中文逗号分隔
+        for sep in [",", "，", " "]:
+            raw = raw.replace(sep, " ")
+        tokens = [t for t in raw.split() if t]
+        try:
+            indices = sorted({int(t) for t in tokens})
+        except ValueError:
+            self.console.print(f"[red]✘ 输入格式错误[/red]")
+            return None
+        if not indices or any(i < 1 or i > 6 for i in indices):
+            self.console.print(f"[red]✘ 编号越界（应为 1-6）[/red]")
+            return None
+
+        # ── 3. 排序（按输入顺序，可重排） ──
+        # 用户的原始顺序（去重）
+        order_input: List[int] = []
+        for t in tokens:
+            try:
+                idx = int(t)
+                if idx not in order_input:
+                    order_input.append(idx)
+            except ValueError:
+                pass
+
+        # 提示调整顺序
+        selected_names = [templates[i - 1].name for i in order_input]
+        self.console.print(
+            f"\n[bold green]{self.i18n.t_str('wizard.steps.selected')}: "
+            f"{' → '.join(selected_names)}[/bold green]"
+        )
+        self.console.print(f"[dim]{self.i18n.t_str('wizard.steps.reorder')}[/dim]")
+        try:
+            reorder_raw = Prompt.ask("  >", default="").strip()
+        except (EOFError, KeyboardInterrupt):
+            return None
+
+        if reorder_raw:
+            for sep in [",", "，", " "]:
+                reorder_raw = reorder_raw.replace(sep, " ")
+            reorder_tokens = [t for t in reorder_raw.split() if t]
+            try:
+                reorder = [int(t) for t in reorder_tokens]
+                # 校验：必须是原 indices 的排列
+                if sorted(reorder) == sorted(indices) and len(reorder) == len(indices):
+                    order_input = reorder
+                else:
+                    self.console.print(
+                        f"[yellow]⚠ 排序输入与原选择不一致，保持原顺序[/yellow]"
+                    )
+            except ValueError:
+                self.console.print(
+                    f"[yellow]⚠ 排序输入格式错误，保持原顺序[/yellow]"
+                )
+
+        # ── 4. 组装结果（含 custom 模板的预渲染） ──
+        result: List[Any] = []
+        for i in order_input:
+            t = templates[i - 1]
+            if t.id == "custom":
+                # 立即收 4 个字段，直接生成 dict（不走 render）
+                custom_dict = self._ask_custom_step()
+                if custom_dict is None:
+                    self.console.print(f"[yellow]⚠ 自定义步骤输入取消，回退到默认[/yellow]")
+                    return None
+                result.append(custom_dict)
+            else:
+                result.append(t)
+        return result
+
+    def _ask_custom_step(self) -> Optional[Dict[str, Any]]:
+        """收集 custom 模板的 4 个字段（name / uses / run / shell）"""
+        try:
+            name = Prompt.ask(
+                f"  [cyan]{self.i18n.t_str('wizard.steps.custom.name')}[/cyan]"
+            ).strip()
+        except (EOFError, KeyboardInterrupt):
+            return None
+        if not name:
+            return None
+        try:
+            uses = Prompt.ask(
+                f"  [cyan]{self.i18n.t_str('wizard.steps.custom.uses')}[/cyan]",
+                default="",
+            ).strip()
+            run = Prompt.ask(
+                f"  [cyan]{self.i18n.t_str('wizard.steps.custom.run')}[/cyan]",
+                default="",
+            ).strip()
+            shell = Prompt.ask(
+                f"  [cyan]{self.i18n.t_str('wizard.steps.custom.shell')}[/cyan]",
+                default="cmd",
+            ).strip() or "cmd"
+        except (EOFError, KeyboardInterrupt):
+            return None
+        # uses / run 至少一个
+        if not uses and not run:
+            self.console.print(
+                f"[red]✘ uses 和 run 至少填一个[/red]"
+            )
+            return None
+        d: Dict[str, Any] = {"name": name}
+        if uses:
+            d["uses"] = uses
+        if run:
+            d["run"] = run
+        if shell:
+            d["shell"] = shell
+        return d
 
     def _show_confirm(
         self,
@@ -664,11 +920,14 @@ def print_header(
     )
 
 
-def print_menu(i18n: I18n, console: Console) -> None:
-    """打印 3 项主菜单"""
+def print_menu(i18n: I18n, console: Console, advanced: bool = False) -> None:
+    """打印主菜单（4 项，含高级选项开关状态）"""
+    state = i18n.t_str("menu.state.on" if advanced else "menu.state.off")
+    item3 = i18n.t_str("menu.item3").replace("{state}", state)
     menu_text = (
         f"  {i18n.t_str('menu.item1')}\n"
         f"  {i18n.t_str('menu.item2')}\n"
+        f"  {item3}\n"
         f"  {i18n.t_str('menu.item0')}"
     )
     console.print(
@@ -689,6 +948,7 @@ def action_generate(
     i18n: I18n,
     console: Console,
     confirmed: Optional[ScriptInfo] = None,
+    advanced: bool = False,
 ) -> None:
     """主菜单项 1：进入 UUP 向导生成 yml"""
     wizard = UUPWizard(
@@ -696,6 +956,7 @@ def action_generate(
         console,
         default_name=confirmed.name if confirmed else None,
         default_build=confirmed.build if confirmed else None,
+        advanced=advanced,
     )
     builder = wizard.run()
     if builder is None:
@@ -778,21 +1039,29 @@ def main() -> int:
         detector = ScriptDetector()
         confirmed = detector.ask_user(i18n, console)
 
+    # ── 高级选项状态：仅当前会话有效 ──
+    advanced = False
+
     while True:
         try:
             print_header(i18n, console, confirmed=confirmed)
-            print_menu(i18n, console)
+            print_menu(i18n, console, advanced=advanced)
 
             choice = Prompt.ask(
                 f"[bold]{i18n.t_str('menu.choose')}[/bold]",
-                choices=["0", "1", "2"],
+                choices=["0", "1", "2", "3"],
                 default="1",
             )
 
             if choice == "1":
-                action_generate(i18n, console, confirmed=confirmed)
+                action_generate(i18n, console, confirmed=confirmed, advanced=advanced)
             elif choice == "2":
                 action_switch_lang(i18n, console)
+            elif choice == "3":
+                advanced = not advanced
+                toggle_key = "menu.toggle_on" if advanced else "menu.toggle_off"
+                console.print(f"\n[bold green]{i18n.t_str(toggle_key)}[/bold green]\n")
+                continue  # 直接回到菜单（不显示「按回车继续」）
             elif choice == "0":
                 console.print(
                     f"\n[bold cyan]{i18n.t_str('goodbye')}[/bold cyan]\n"

@@ -437,6 +437,157 @@ def test_build_mapping():
     print("  [OK] Build Mapping 查表 + 集成全部正确")
 
 
+def test_step_template_render():
+    """测试 StepTemplate 6 个模板的 render 输出"""
+    print("\n=== Test 11: StepTemplate Render ===")
+    templates = wg.StepTemplate.all()
+    assert len(templates) == 6, f"expected 6 templates, got {len(templates)}"
+    print(f"  ✓ 共 {len(templates)} 个模板")
+
+    by_id = {t.id: t for t in templates}
+
+    # checkout
+    s = by_id["checkout"].render()
+    assert s == {"name": "Checkout", "uses": "actions/checkout@v5"}
+    print("  ✓ checkout: actions/checkout@v5")
+
+    # build
+    s = by_id["build"].render()
+    assert s["name"] == "Build ISO"
+    assert s["shell"] == "cmd", "build 必须声明 shell: cmd"
+    assert "uup_download_windows.cmd" in s["run"]
+    assert "${{ env.FILE_NAME }}" in s["run"]
+    print("  ✓ build: shell=cmd + uup_download_windows.cmd")
+
+    # package
+    s = by_id["package"].render()
+    assert s["name"] == "Package"
+    assert " -mx=9" in s["run"], "package 必须含 -mx=9"
+    assert " -v1950m " in s["run"], "package 必须含 -v1950m"
+    assert "${{ env.Build_VERSION }}" in s["run"]
+    print("  ✓ package: -v1950m ... -mx=9")
+
+    # upload
+    s = by_id["upload"].render()
+    assert s["uses"] == "actions/upload-artifact@v4"
+    assert s["with"]["name"].endswith("${{ env.Build_VERSION }}")
+    assert s["with"]["path"].endswith(".7z*")
+    print("  ✓ upload: actions/upload-artifact@v4")
+
+    # release
+    s = by_id["release"].render()
+    assert s["uses"] == "softprops/action-gh-release@v2"
+    assert "tag_name" in s["with"]
+    print("  ✓ release: softprops/action-gh-release@v2")
+
+    # custom 应 raise NotImplementedError
+    try:
+        by_id["custom"].render()
+        assert False, "custom render() should raise"
+    except NotImplementedError:
+        print("  ✓ custom: render() raise NotImplementedError（走 ask 预渲染）")
+
+    print("  [OK] 6 模板 render 输出全部正确")
+
+
+def test_advanced_wizard_construction():
+    """测试 UUPWizard 接受 advanced 参数"""
+    print("\n=== Test 12: UUPWizard Advanced ===")
+    import io
+    from rich.console import Console
+    i18n = wg.I18n("zh")
+    console = Console(file=io.StringIO(), width=120, force_terminal=False)
+
+    # 默认 advanced=False
+    w1 = wg.UUPWizard(i18n, console)
+    assert w1.advanced is False
+    assert w1._selected_steps is None
+    print("  ✓ 默认 advanced=False, _selected_steps=None")
+
+    # 显式 advanced=True
+    w2 = wg.UUPWizard(i18n, console, advanced=True)
+    assert w2.advanced is True
+    assert w2._selected_steps is None  # 尚未选
+    print("  ✓ advanced=True 时初始化成功")
+
+    print("  [OK] UUPWizard advanced 参数接受正常")
+
+
+def test_build_steps_with_advanced_selected():
+    """测试 _build_steps 在高级模式下用用户选择的步骤"""
+    print("\n=== Test 13: _build_steps Advanced ===")
+    import io
+    from rich.console import Console
+    i18n = wg.I18n("zh")
+    console = Console(file=io.StringIO(), width=120, force_terminal=False)
+
+    # 1. 高级模式 + 用户选了 checkout + build + package
+    w = wg.UUPWizard(i18n, console, advanced=True)
+    by_id = {t.id: t for t in wg.StepTemplate.all()}
+    w._selected_steps = [by_id["checkout"], by_id["build"], by_id["package"]]
+    steps = w._build_steps(release_idx=0)  # release_idx 应被忽略
+    assert len(steps) == 3, f"expected 3 steps, got {len(steps)}"
+    assert steps[0]["uses"] == "actions/checkout@v5"
+    assert steps[1]["shell"] == "cmd"
+    assert " -mx=9" in steps[2]["run"]
+    print(f"  ✓ 高级模式+3 模板: {len(steps)} 步 (checkout/build/package)")
+
+    # 2. 高级模式 + 空选择 → 走默认 4 步
+    w2 = wg.UUPWizard(i18n, console, advanced=True)
+    w2._selected_steps = None
+    steps = w2._build_steps(release_idx=0)
+    assert len(steps) == 4, f"default should be 4 steps, got {len(steps)}"
+    assert steps[-1]["uses"] == "actions/upload-artifact@v4"
+    print(f"  ✓ 高级模式但未选: 走默认 {len(steps)} 步 (含 upload)")
+
+    # 3. 高级模式 + release_idx=1 (含 release) → 但有 _selected_steps 时 release 被忽略
+    w3 = wg.UUPWizard(i18n, console, advanced=True)
+    w3._selected_steps = [by_id["checkout"]]
+    steps = w3._build_steps(release_idx=1)
+    assert len(steps) == 1, f"应该只有 1 步, got {len(steps)}"
+    print(f"  ✓ 高级模式覆盖 release_idx: {len(steps)} 步")
+
+    # 4. 非高级模式 → 默认 4 步（回归测试）
+    w4 = wg.UUPWizard(i18n, console, advanced=False)
+    steps = w4._build_steps(release_idx=0)
+    assert len(steps) == 4
+    print(f"  ✓ 非高级模式: 4 步默认 (回归)")
+
+    print("  [OK] _build_steps 高级模式分支正确")
+
+
+def test_menu_item3_i18n():
+    """测试 i18n 新增的 menu.item3 等键"""
+    print("\n=== Test 14: Menu Item3 I18n ===")
+    i18n = wg.I18n("zh")
+    item3_zh = i18n.t("menu.item3")
+    assert "{state}" in item3_zh, f"item3 应含 {{state}} 占位符: {item3_zh}"
+    assert "[3]" in item3_zh
+    rendered_zh = item3_zh.replace("{state}", i18n.t("menu.state.off"))
+    assert "关闭" in rendered_zh
+    print(f"  ✓ zh: {rendered_zh}")
+
+    i18n.switch("en")
+    item3_en = i18n.t("menu.item3")
+    assert "{state}" in item3_en
+    rendered_en = item3_en.replace("{state}", i18n.t("menu.state.off"))
+    assert "OFF" in rendered_en
+    print(f"  ✓ en: {rendered_en}")
+
+    # 其他新增键
+    for k in ("menu.state.on", "menu.state.off",
+              "menu.toggle_on", "menu.toggle_off",
+              "wizard.steps", "wizard.steps.help",
+              "wizard.steps.reorder", "wizard.steps.custom.name",
+              "wizard.steps.custom.uses", "wizard.steps.custom.run",
+              "wizard.steps.custom.shell", "wizard.steps.selected"):
+        assert k in wg.I18N["zh"], f"zh 缺 {k}"
+        assert k in wg.I18N["en"], f"en 缺 {k}"
+    print(f"  ✓ 中英各 {12} 个新键齐全")
+
+    print("  [OK] i18n 新增键全部就位")
+
+
 def main():
     import tempfile
     print("=" * 60)
@@ -454,6 +605,10 @@ def main():
     test_uup_wizard_default_change()
     test_build_mapping()
     test_cli_help()
+    test_step_template_render()
+    test_advanced_wizard_construction()
+    test_build_steps_with_advanced_selected()
+    test_menu_item3_i18n()
     print("\n" + "=" * 60)
     print("[ALL TESTS PASSED]")
     print("=" * 60)
