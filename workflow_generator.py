@@ -359,7 +359,7 @@ class StepTemplate:
                 "name": "Build ISO",
                 "shell": "cmd",
                 "run": (
-                    'cd "${{ env.FILE_NAME }}"\n'
+                    'cd "${{ env.UUP_DIR }}"\n'
                     "uup_download_windows.cmd"
                 ),
             }
@@ -369,7 +369,7 @@ class StepTemplate:
                 "run": (
                     '7z a -v1950m "${{ env.FILE_NAME }}-'
                     '${{ env.Build_VERSION }}.7z" '
-                    '"./${{ env.FILE_NAME }}/*.iso"'
+                    '"./${{ env.UUP_DIR }}/*.iso"'
                     ' -mx=9'
                 ),
             }
@@ -513,6 +513,7 @@ class UUPWizard:
         default_name: Optional[str] = None,
         default_build: Optional[str] = None,
         advanced: bool = False,
+        uup_dir: Optional[str] = None,
     ) -> None:
         self.i18n = i18n
         self.console = console
@@ -526,6 +527,8 @@ class UUPWizard:
         self.advanced = advanced
         # 步骤选择器的结果（None = 用默认 4 步序列）
         self._selected_steps: Optional[List[Any]] = None
+        # UUP 脚本目录的相对路径（用于 yml 的 UUP_DIR env；None = 与 FILE_NAME 同名）
+        self._uup_dir: Optional[str] = uup_dir
 
     def run(self) -> Optional[YmlBuilder]:
         """执行 5 步引导式问答，返回 YmlBuilder 或 None（用户取消）"""
@@ -601,12 +604,20 @@ class UUPWizard:
             "Build_VERSION": version,
             "FILE_NAME": name,
         }
+        # UUP_DIR：检测到 UUPdump script/ 时填嵌套路径，否则 fallback 到 FILE_NAME
+        # （保持与 .example/UUPdumpWinISO-main 一致的目录约定）
+        if self._uup_dir:
+            env["UUP_DIR"] = self._uup_dir
+        else:
+            env["UUP_DIR"] = name
 
         # ── 构造固定步骤 ──
         steps = self._build_steps(release_idx)
 
         # ── 确认信息 ──
-        self._show_confirm(name, version, runs_on, timeout, release_idx, steps)
+        self._show_confirm(
+            name, version, runs_on, timeout, release_idx, steps, env["UUP_DIR"]
+        )
 
         if not Confirm.ask(
             f"\n[bold cyan]确认生成？[/bold cyan]", default=True
@@ -633,7 +644,7 @@ class UUPWizard:
                 "name": "Build ISO",
                 "shell": "cmd",
                 "run": (
-                    'cd "${{ env.FILE_NAME }}"\n'
+                    'cd "${{ env.UUP_DIR }}"\n'
                     "uup_download_windows.cmd"
                 ),
             },
@@ -642,7 +653,7 @@ class UUPWizard:
                 "run": (
                     '7z a -v1950m "${{ env.FILE_NAME }}-'
                     '${{ env.Build_VERSION }}.7z" '
-                    '"./${{ env.FILE_NAME }}/*.iso"'
+                    '"./${{ env.UUP_DIR }}/*.iso"'
                     ' -mx=9'
                 ),
             },
@@ -825,6 +836,7 @@ class UUPWizard:
         timeout: int,
         release_idx: int,
         steps: List[Dict[str, Any]],
+        uup_dir: str = "",
     ) -> None:
         """显示确认信息"""
         release_labels = self.i18n.t_list("opts.release")
@@ -844,6 +856,8 @@ class UUPWizard:
         self.console.print(f"  运行环境:    [bold]{runs_on}[/bold]")
         self.console.print(f"  超时:        [bold]{timeout}[/bold] 分钟")
         self.console.print(f"  发布方式:    [bold]{release_labels[release_idx]}[/bold]")
+        if uup_dir:
+            self.console.print(f"  脚本目录:    [bold]{uup_dir}[/bold]")
         self.console.print(f"\n  [dim]步骤清单:[/dim]")
         for i, step in enumerate(steps, 1):
             sname = step.get("name", "")
@@ -953,12 +967,17 @@ def action_generate(
     advanced: bool = False,
 ) -> None:
     """主菜单项 1：进入 UUP 向导生成 yml"""
+    # 构造 UUP_DIR：检测到 UUPdump script/ 时填嵌套路径，否则保持 None（fallback 到 FILE_NAME）
+    uup_dir: Optional[str] = None
+    if confirmed and confirmed.dir_name:
+        uup_dir = str(Path("UUPdump script") / confirmed.dir_name)
     wizard = UUPWizard(
         i18n,
         console,
         default_name=confirmed.name if confirmed else None,
         default_build=confirmed.build if confirmed else None,
         advanced=advanced,
+        uup_dir=uup_dir,
     )
     builder = wizard.run()
     if builder is None:

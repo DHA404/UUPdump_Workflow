@@ -6,17 +6,18 @@ jobs:
     env:
       Build_VERSION: '26200.8968'
       FILE_NAME: Windows11_25H2_amd64
+      UUP_DIR: UUPdump script\26200.8968_amd64_zh-cn_professional_6b4cc4c9_convert_virtual
     timeout-minutes: 360
     steps:
     - name: Checkout
       uses: actions/checkout@v5
     - name: Build ISO
       shell: cmd
-      run: 'cd "${{ env.FILE_NAME }}"
+      run: 'cd "${{ env.UUP_DIR }}"
 
         uup_download_windows.cmd'
     - name: Package
-      run: 7z a -v1950m "${{ env.FILE_NAME }}-${{ env.Build_VERSION }}.7z" "./${{ env.FILE_NAME }}/*.iso" -mx=9
+      run: 7z a -v1950m "${{ env.FILE_NAME }}-${{ env.Build_VERSION }}.7z" "./${{ env.UUP_DIR }}/*.iso" -mx=9
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:

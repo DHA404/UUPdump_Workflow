@@ -166,7 +166,7 @@ def test_uup_wizard_flow():
     build_step = next(s for s in steps0 if s["name"] == "Build ISO")
     assert "\n" in build_step["run"], "Build ISO 应该是多行命令"
     assert "uup_download_windows.cmd" in build_step["run"]
-    assert "env.FILE_NAME" in build_step["run"]
+    assert "env.UUP_DIR" in build_step["run"]
     print("  Build ISO 多行命令正确 ✓")
 
     # 验证 package-7z 包含 1950m 分卷
@@ -359,7 +359,7 @@ def test_cli_help():
         [sys.executable, "workflow_generator.py", "--help"],
         capture_output=True, text=True, encoding="utf-8", errors="replace",
         env=env,
-        cwd=str(Path(__file__).parent),
+        cwd=str(Path(__file__).parent.parent),
     )
     assert result.returncode == 0, f"help failed: {result.stderr}"
     # --help 走 argparse（不走 rich），输出是纯 ASCII
@@ -458,7 +458,7 @@ def test_step_template_render():
     assert s["name"] == "Build ISO"
     assert s["shell"] == "cmd", "build 必须声明 shell: cmd"
     assert "uup_download_windows.cmd" in s["run"]
-    assert "${{ env.FILE_NAME }}" in s["run"]
+    assert "${{ env.UUP_DIR }}" in s["run"]
     print("  ✓ build: shell=cmd + uup_download_windows.cmd")
 
     # package
@@ -809,6 +809,93 @@ def test_args_no_auto_lang():
     print("  [OK] parse_args 开关全部正确")
 
 
+def test_yml_builder_with_uup_dir():
+    """测试 UUP_DIR env 注入和步骤引用（修复 uup_download_windows.cmd 路径错误）"""
+    print("\n=== Test: UUP_DIR injection ===")
+    b = wg.YmlBuilder()
+    b.set_name("Windows11_25H2_amd64")
+    b.set_trigger("workflow_dispatch")
+    b.add_job(
+        "build",
+        "windows-latest",
+        [
+            {"name": "Checkout", "uses": "actions/checkout@v5"},
+            {
+                "name": "Build ISO",
+                "shell": "cmd",
+                "run": 'cd "${{ env.UUP_DIR }}"\nuup_download_windows.cmd',
+            },
+            {
+                "name": "Package",
+                "run": (
+                    '7z a -v1950m "${{ env.FILE_NAME }}-${{ env.Build_VERSION }}.7z" '
+                    '"./${{ env.UUP_DIR }}/*.iso" -mx=9'
+                ),
+            },
+        ],
+        env={
+            "Build_VERSION": "26200.8968",
+            "FILE_NAME": "Windows11_25H2_amd64",
+            "UUP_DIR": "UUPdump script/26200.8968_amd64_zh-cn_professional_6b4cc4c9_convert_virtual",
+        },
+        timeout=360,
+    )
+    import yaml
+    parsed = yaml.safe_load(b.to_yaml())
+    env = parsed["jobs"]["build"]["env"]
+    assert "UUP_DIR" in env, "UUP_DIR env 缺失"
+    assert env["UUP_DIR"].startswith("UUPdump script/"), f"UUP_DIR 应指向脚本目录: {env['UUP_DIR']}"
+    steps = parsed["jobs"]["build"]["steps"]
+    build_step = next(s for s in steps if s["name"] == "Build ISO")
+    assert "UUP_DIR" in build_step["run"], "cd 步骤必须使用 UUP_DIR"
+    assert "uup_download_windows.cmd" in build_step["run"]
+    pkg_step = next(s for s in steps if s["name"] == "Package")
+    assert "UUP_DIR" in pkg_step["run"], "7z 步骤必须使用 UUP_DIR"
+    assert "-mx=9" in pkg_step["run"]
+    print("  [OK] UUP_DIR env + 步骤引用全部正确")
+
+
+def test_step_template_uses_uup_dir():
+    """StepTemplate 渲染应使用 UUP_DIR 而非 FILE_NAME"""
+    print("\n=== Test: StepTemplate UUP_DIR ===")
+    for tpl in wg.StepTemplate.all():
+        if tpl.id in ("checkout", "custom"):
+            continue
+        rendered = tpl.render()
+        run = rendered.get("run", "")
+        if "cd" in run or "7z" in run:
+            assert "UUP_DIR" in run, f"{tpl.id} 模板未使用 UUP_DIR: {run}"
+    print("  [OK] StepTemplate 全部步骤模板引用 UUP_DIR")
+
+
+def test_wizard_uup_dir_fallback():
+    """UUPWizard 不传 uup_dir 时 UUP_DIR 应回退到 name"""
+    print("\n=== Test: UUPWizard uup_dir fallback ===")
+    console = MagicMock()
+    i18n = wg.I18n("zh")
+    # 不传 uup_dir，应回退到 name
+    wiz = wg.UUPWizard(i18n, console, default_name="Win11", default_build="26200.1")
+    assert wiz._uup_dir is None
+    # 模拟构造 env（用 run 内的实际逻辑）
+    name = "Win11"
+    env: dict = {"Build_VERSION": "26200.1", "FILE_NAME": name}
+    if wiz._uup_dir:
+        env["UUP_DIR"] = wiz._uup_dir
+    else:
+        env["UUP_DIR"] = name
+    assert env["UUP_DIR"] == "Win11", f"fallback 失败: {env['UUP_DIR']}"
+
+    # 传 uup_dir 时应使用
+    wiz2 = wg.UUPWizard(i18n, console, default_name="Win11", uup_dir="UUPdump script/foo")
+    env2: dict = {"Build_VERSION": "26200.1", "FILE_NAME": "Win11"}
+    if wiz2._uup_dir:
+        env2["UUP_DIR"] = wiz2._uup_dir
+    else:
+        env2["UUP_DIR"] = "Win11"
+    assert env2["UUP_DIR"] == "UUPdump script/foo", f"传参未生效: {env2['UUP_DIR']}"
+    print("  [OK] UUPWizard uup_dir fallback + 传参均正确")
+
+
 def main():
     import tempfile
     print("=" * 60)
@@ -834,6 +921,9 @@ def main():
     test_detect_from_windows_api()
     test_detect_priority()
     test_args_no_auto_lang()
+    test_yml_builder_with_uup_dir()
+    test_step_template_uses_uup_dir()
+    test_wizard_uup_dir_fallback()
     print("\n" + "=" * 60)
     print("[ALL TESTS PASSED]")
     print("=" * 60)

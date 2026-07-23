@@ -18,11 +18,15 @@ b.add_job(
         {"name": "Checkout", "uses": "actions/checkout@v5"},
         {
             "name": "Build ISO",
-            "run": 'cd "${{ env.FILE_NAME }}"\nuup_download_windows.cmd',
+            "shell": "cmd",
+            "run": 'cd "${{ env.UUP_DIR }}"\nuup_download_windows.cmd',
         },
         {
             "name": "Package",
-            "run": '7z a -v1950m "${{ env.FILE_NAME }}-${{ env.Build_VERSION }}.7z" "./${{ env.FILE_NAME }}/*.iso"',
+            "run": (
+                '7z a -v1950m "${{ env.FILE_NAME }}-${{ env.Build_VERSION }}.7z" '
+                '"./${{ env.UUP_DIR }}/*.iso" -mx=9'
+            ),
         },
         {
             "name": "Release",
@@ -33,7 +37,11 @@ b.add_job(
             },
         },
     ],
-    env={"Build_VERSION": "26100.8313", "FILE_NAME": "Windows11_24H2_amd64"},
+    env={
+        "Build_VERSION": "26100.8313",
+        "FILE_NAME": "Windows11_24H2_amd64",
+        "UUP_DIR": "Windows11_24H2_amd64",
+    },
     timeout=360,
 )
 

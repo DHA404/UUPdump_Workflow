@@ -210,6 +210,19 @@ python workflow_generator.py --no-auto-lang
   > 1
 ```
 
+### 检测结果对 yml 的影响 / Impact on Generated yml
+
+检测到的脚本目录会自动注入到生成的 yml 中（`FILE_NAME` 与脚本目录解耦）：
+
+| 变量 | 含义 | 示例（检测到上述脚本时） |
+|------|------|------------------------|
+| `FILE_NAME` | 产物名基础（artifact / Release / 7z 输出） | `Windows11_25H2_amd64` |
+| `UUP_DIR` | UUP 脚本目录的相对路径 | `UUPdump script/26200.8968_amd64_zh-cn_professional_6b4cc4c9_convert_virtual` |
+
+- `cd` 和 7z 步骤自动使用 `UUP_DIR` 引用脚本目录
+- artifact / Release 名仍使用 `FILE_NAME`，与脚本目录名解耦
+- 跳过检测（`--no-detect`）时，`UUP_DIR` 退化为 `FILE_NAME`，与 `.example/UUPdumpWinISO-main` 目录约定一致
+
 ## 🧙 向导流程 / Wizard Flow
 
 选择 `[1] Generate` 后，向导按 **5 步** 询问（高级模式为 6 步，含第 0 步步骤选择器）：
@@ -277,17 +290,18 @@ jobs:
     env:
       Build_VERSION: '26200.8968'
       FILE_NAME: Windows11_25H2_amd64
+      UUP_DIR: UUPdump script/26200.8968_amd64_zh-cn_professional_6b4cc4c9_convert_virtual
     timeout-minutes: 360
     steps:
     - name: Checkout
       uses: actions/checkout@v5
     - name: Build ISO
       shell: cmd
-      run: 'cd "${{ env.FILE_NAME }}"
+      run: 'cd "${{ env.UUP_DIR }}"
 
         uup_download_windows.cmd'
     - name: Package
-      run: 7z a -v1950m "${{ env.FILE_NAME }}-${{ env.Build_VERSION }}.7z" "./${{ env.FILE_NAME }}/*.iso" -mx=9
+      run: 7z a -v1950m "${{ env.FILE_NAME }}-${{ env.Build_VERSION }}.7z" "./${{ env.UUP_DIR }}/*.iso" -mx=9
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
@@ -296,6 +310,8 @@ jobs:
 ```
 
 > `shell: cmd` 与 `-mx=9` 与 `.example/UUPdumpWinISO-main` 真实工作流保持一致：CMD 显式声明确保 `.cmd` 脚本被正确执行；最高压缩级别减小 artifact 体积。
+>
+> `UUP_DIR` 与 `FILE_NAME` 解耦：`FILE_NAME` 控制产物命名（artifact / Release / 7z 输出），`UUP_DIR` 指向 UUP 脚本目录。当自动检测到 `UUPdump script/<dir_name>/` 时，`UUP_DIR` 填嵌套路径；否则与 `FILE_NAME` 同名。
 
 ## ▶️ 运行工作流教程 / Run the Workflow
 
@@ -443,6 +459,8 @@ UUPdump_Workflow/
 | 12 | Build 不在映射表内？ | 自动回退到 `Windows_<build>_<arch>` 格式兜底命名；可在 [build_mapping.py](build_mapping.py) 补全 |
 | 13 | 高级选项怎么用？ | 主菜单按 `[3]` 开启 → 进入 `[1]` 向导第 0 步多选步骤模板 |
 | 14 | 自定义步骤支持什么？ | 任意 `name` / `uses` / `run` / `shell` 组合（`uses` 和 `run` 至少填一个） |
+| 15 | 报 `The system cannot find the path specified`？ | `UUP_DIR` 未正确指向脚本目录：检查 `env.UUP_DIR` 是否等于 `UUPdump script/<dir_name>`；手改 yml 时请保持同步 |
+| 16 | 7z 步骤找不到 `*.iso`？ | ISO 在 `${{ env.UUP_DIR }}` 目录下，7z 输入路径已自动使用 `UUP_DIR`；手改 yml 时请保持同步 |
 
 ## ⚠️ 限制 / Limitations
 
