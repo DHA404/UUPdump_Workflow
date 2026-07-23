@@ -1,0 +1,23 @@
+name: Windows11_25H2_amd64
+on: workflow_dispatch
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      Build_VERSION: '26200.8968'
+      FILE_NAME: Windows11_25H2_amd64
+    timeout-minutes: 360
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v5
+    - name: Build ISO
+      run: 'cd "${{ env.FILE_NAME }}"
+
+        uup_download_windows.cmd'
+    - name: Package
+      run: 7z a -v1950m "${{ env.FILE_NAME }}-${{ env.Build_VERSION }}.7z" "./${{ env.FILE_NAME }}/*.iso"
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ env.FILE_NAME }}-${{ env.Build_VERSION }}
+        path: ${{ env.FILE_NAME }}-${{ env.Build_VERSION }}.7z*
