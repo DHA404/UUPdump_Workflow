@@ -234,8 +234,9 @@ class I18n:
 class ScriptInfo:
     """单个 UUP 脚本目录的元数据，由 ScriptDetector 解析得出"""
     dir_name: str                                # 原始目录名
-    name: Optional[str] = None                   # 默认 FILE_NAME（Windows11_25H2_amd64 形式）
+    name: Optional[str] = None                   # 默认 FILE_NAME（Windows11_25H2_amd64_zh-cn 形式）
     build: Optional[str] = None                  # 默认 Build 编号（26200.8894 形式）
+    lang: Optional[str] = None                   # 语言标识（zh-cn / en-us 等）
 
 
 # ============================================================
@@ -253,6 +254,8 @@ class ScriptDetector:
     RELEASE_RE = re.compile(r"(\d{2})H(\d)", re.IGNORECASE)
     # amd64 / x86 / arm64（用 lookaround 排除字母/数字，下划线算分隔符）
     ARCH_RE = re.compile(r"(?<![a-zA-Z0-9])(amd64|x86|arm64)(?![a-zA-Z0-9])", re.IGNORECASE)
+    # 语言标识：xx-xx 格式（如 zh-cn, en-us），位于 arch 之后
+    LANG_RE = re.compile(r"(?:amd64|x86|arm64)_([a-z]{2}-[a-z]{2})", re.IGNORECASE)
 
     def __init__(self, base: Optional[Path] = None) -> None:
         self.base = base if base is not None else self.BASE_DIR
@@ -272,9 +275,11 @@ class ScriptDetector:
         name_str = d.name
         build_m = self.BUILD_RE.search(name_str)
         arch_m = self.ARCH_RE.search(name_str)
+        lang_m = self.LANG_RE.search(name_str)
 
         build = build_m.group(1) if build_m else None
         arch = arch_m.group(1) if arch_m else None
+        lang = lang_m.group(1).lower() if lang_m else None
 
         # 优先查 build_mapping 映射表
         mapped: Optional[str] = None
@@ -305,10 +310,15 @@ class ScriptDetector:
             else:
                 default_name = name_str.split(" ")[0] if name_str else "MyWorkflow"
 
+        # 追加语言后缀（仅当检测到语言时）
+        if lang:
+            default_name = f"{default_name}_{lang}"
+
         return ScriptInfo(
             dir_name=name_str,
             name=default_name,
             build=build,
+            lang=lang,
         )
 
     def ask_user(self, i18n: "I18n", console: "Console") -> Optional[ScriptInfo]:

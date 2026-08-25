@@ -256,7 +256,7 @@ def test_script_detector(tmp_path):
             (
                 "26200.8894_amd64_zh-cn_professional_a2702664_convert_virtual (1)",
                 "26200.8894",
-                "Windows11_25H2_amd64",  # build_mapping 查出 Win11 25H2
+                "Windows11_25H2_amd64_zh-cn",  # build_mapping 查出 Win11 25H2 + 语言后缀
             ),
             (
                 "Windows10_22H2_amd64_Cumulative_Update",
@@ -271,7 +271,7 @@ def test_script_detector(tmp_path):
             (
                 "26100.8313_amd64_en-us_professional",
                 "26100.8313",
-                "Windows11_24H2_amd64",  # build_mapping 查出 Win11 24H2
+                "Windows11_24H2_amd64_en-us",  # build_mapping 查出 Win11 24H2 + 语言后缀
             ),
             (
                 "Windows11_24H2_x86",
@@ -419,7 +419,7 @@ def test_build_mapping():
         d1 = base / "26200.8968_amd64_zh-cn_professional"
         d1.mkdir()
         info = wg.ScriptDetector(base=base)._parse(d1)
-        assert info.name == "Windows11_25H2_amd64", f"got {info.name}"
+        assert info.name == "Windows11_25H2_amd64_zh-cn", f"got {info.name}"
         print(f"  有映射: {info.name} ✓")
 
         # 测试目录：有 windows 关键字和 release 别名（走兜底）
