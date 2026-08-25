@@ -379,10 +379,13 @@ def test_build_mapping():
     assert bm_resolve("26200.8968", "amd64") == "Windows11_25H2_amd64"
     print("  ✓ Win11 25H2: Windows11_25H2_amd64")
 
-    # Win11 24H2
-    assert lookup("26100.8313") == ("Windows11", "24H2"), "Win11 24H2"
+    # Win11 24H2 / Server 2025 (Build 26100 多候选)
+    assert lookup("26100.8313") == ("Windows11", "24H2"), "Win11 24H2 default"
     assert bm_resolve("26100.8313", "amd64") == "Windows11_24H2_amd64"
-    print("  ✓ Win11 24H2: Windows11_24H2_amd64")
+    print("  ✓ Win11 24H2: Windows11_24H2_amd64 (default)")
+    assert lookup("26100", dir_name="server_2025") == ("WindowsServer2025", ""), "Server 2025 via dir_name"
+    assert bm_resolve("26100", "amd64", dir_name="server_2025") == "WindowsServer2025_amd64"
+    print("  ✓ Server 2025: WindowsServer2025_amd64 (dir_name=server)")
 
     # Win10 1809
     assert lookup("17763") == ("Windows10", "1809"), "Win10 1809"
@@ -435,6 +438,35 @@ def test_build_mapping():
         info3 = wg.ScriptDetector(base=base)._parse(d3)
         assert "Windows" not in info3.name  # 无 build 时取目录名
         print(f"  完全降级: {info3.name} ✓")
+
+    # Build 26100 多候选消歧测试
+    print("\n  --- Build 26100 Server 2025 消歧测试 ---")
+    from build_mapping import lookup as bm_lookup
+
+    # dir_name 含 server → 直接匹配（无需文件检测）
+    result2 = bm_lookup("26100", dir_name="server_2025_test")
+    assert result2 == ("WindowsServer2025", ""), f"dir_name server: {result2}"
+    print(f"  dir_name=server → Server2025 ✓")
+
+    # 无 dir_name → 默认客户端
+    result_default = bm_lookup("26100")
+    assert result_default == ("Windows11", "24H2"), f"default: {result_default}"
+    print(f"  无 dir_name → Win11_24H2 (default) ✓")
+
+    # 真实目录验证（如果存在）
+    real_srv = Path("UUPdump_script/26100.33296_amd64_zh-cn_multi_5b8bc4bb_convert")
+    if real_srv.exists():
+        from build_mapping import lookup as bm_lookup_real
+        result_real = bm_lookup_real("26100.33296", dir_name=real_srv.name)
+        assert result_real == ("WindowsServer2025", ""), f"真实 Server 目录: {result_real}"
+        print(f"  真实 Server 2025 目录检测: WindowsServer2025 ✓")
+
+    real_cli = Path("UUPdump_script/26100.9267_amd64_zh-cn_multi_85379332_convert_virtual")
+    if real_cli.exists():
+        from build_mapping import lookup as bm_lookup_cli
+        result_cli = bm_lookup_cli("26100.9267", dir_name=real_cli.name)
+        assert result_cli == ("Windows11", "24H2"), f"真实 Client 目录: {result_cli}"
+        print(f"  真实 Win11 24H2 目录检测: Windows11_24H2 ✓")
 
     print("  [OK] Build Mapping 查表 + 集成全部正确")
 

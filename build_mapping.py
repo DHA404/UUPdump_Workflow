@@ -15,6 +15,7 @@ Build 版本映射表（独立脚本）
   python build_mapping.py                → 打印全量建表
 """
 import sys
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
 
 # ============================================================
@@ -26,7 +27,7 @@ BUILD_MAP: Dict[int, Union[Tuple[str, str], List[Tuple[str, str]]]] = {
     22000: ("Windows11", "21H2"),
     22621: ("Windows11", "22H2"),
     22631: ("Windows11", "23H2"),
-    26100: ("Windows11", "24H2"),
+    26100: [("Windows11", "24H2"), ("WindowsServer2025", "")],
     26200: ("Windows11", "25H2"),
     26300: ("Windows11", "26H2"),
     28000: ("Windows11", "26H1"),
@@ -61,15 +62,28 @@ def _major(build_str: str) -> Optional[int]:
 def lookup(
     build_str: str, dir_name: str = ""
 ) -> Optional[Tuple[str, str]]:
-    """查表返回 (product, alias)，ambiguous 时根据 dir_name 含 'server' 择一"""
+    """查表返回 (product, alias)，ambiguous 时根据 dir_name 或脚本内容择一"""
     major = _major(build_str)
     if major is None:
         return None
     result = BUILD_MAP.get(major)
     if isinstance(result, list):
-        # 多候选：优先匹配 server
+        # 多候选消歧
+        # 1. dir_name 含 "server" → 选 Server 候选
         if dir_name and "server" in dir_name.lower():
             return result[1] if len(result) > 1 else result[0]
+        # 2. 读取 uup_download_windows.cmd 检测 edition 参数
+        if dir_name:
+            cmd_path = Path(__file__).parent / "UUPdump_script" / dir_name / "uup_download_windows.cmd"
+            if cmd_path.exists():
+                try:
+                    content = cmd_path.read_text(encoding="utf-8", errors="ignore")
+                    # 检查 edition= 参数是否包含 server 版本标识
+                    if "serverdatacenter" in content or "serverstandard" in content:
+                        return result[1] if len(result) > 1 else result[0]
+                except Exception:
+                    pass
+        # 默认选第一个候选（客户端版本）
         return result[0]
     return result
 
