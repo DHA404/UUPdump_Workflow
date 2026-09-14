@@ -352,16 +352,59 @@ class ScriptDetector:
 # ============================================================
 # Build ISO 步骤的 run 命令构造
 # ============================================================
-# UUP dump 官方生成的 uup_download_windows.cmd 存在 cmd 缺陷：
-#   if %ERRORLEVEL% GTR 0 goto :DOWNLOAD_UUPS & exit /b 1
-# 其中 goto 立即跳转不返回，& 后的 exit /b 1 是死代码（IDE 静态审查会报错）。
-# 在执行官方脚本前先用 PowerShell 打补丁移除该死代码，确保 workflow 运行不受影响。
-# PowerShell 命令幂等：无缺陷时替换不生效，原样写回。
+# UUP dump 官方生成的 uup_download_windows.cmd 存在多处缺陷，
+# CI 执行前用 PowerShell 自动打补丁（幂等，重复执行内容不变）：
+#   1) goto 后的 exit /b 1 是死代码（IDE 静态审查报错）
+#   2) 脚本获取（get.php 动态接口）无超时参数，网络停滞时假死约 5 分钟
+#   3) 脚本获取失败一次即整体退出，而非像文件下载步骤那样自动重试
+# 补丁技巧：
+#   - 用 "--allow-overwrite=true --auto-file-renaming=false" 定位脚本获取命令
+#     （该组合仅出现在 get.php 获取命令中），负向环视保证已打补丁时不再插入
+#   - 用 edition=app 行上下文环视区分 Store Apps / UUP set 两处失败的重试目标
+#     （.NET 正则支持变长环视，Windows PowerShell 5.1 可用）
+#   - 补丁文本全程不含双引号，避免与 cmd 的 -Command "..." 外层引号冲突
+#   - cmd batch 层 % 须写成 %%，防止 cmd 预先展开 %ERRORLEVEL% 等变量
+#   - 用 [IO.File]::WriteAllText 写回（不追加换行），保证幂等
+_PS_REPLACES = [
+    # 1) 修复 goto 后的死代码 exit /b 1
+    ("goto :DOWNLOAD_UUPS & exit /b 1", "goto :DOWNLOAD_UUPS"),
+    # 2) 为脚本获取命令添加快速失败参数（--retry-wait=5 环视保证幂等）
+    (
+        r"(?<!--retry-wait=5 )--allow-overwrite=true --auto-file-renaming=false",
+        "--timeout=30 --max-tries=5 --retry-wait=5 "
+        "--allow-overwrite=true --auto-file-renaming=false",
+    ),
+    # 3) Store Apps 脚本获取失败 → 自动重试（上下文环视精确定位）
+    (
+        r"(?<=edition=app&aria2=2\r?\n)"
+        "if %ERRORLEVEL% GTR 0 call :DOWNLOAD_ERROR & exit /b 1",
+        "if %ERRORLEVEL% GTR 0 goto :DOWNLOAD_APPS",
+    ),
+    # 4) UUP set 脚本获取失败 → 自动重试（3 处理完后此条仅命中 UUP set 一处）
+    (
+        "if %ERRORLEVEL% GTR 0 call :DOWNLOAD_ERROR & exit /b 1",
+        "if %ERRORLEVEL% GTR 0 goto :DOWNLOAD_UUPS",
+    ),
+]
+
+
+def _batch_escape(s: str) -> str:
+    """cmd batch 层转义：% → %%，防止 cmd 预先展开 %ERRORLEVEL% 等变量"""
+    return s.replace("%", "%%")
+
+
 _CMD_SCRIPT_FIX = (
-    'powershell -NoProfile -Command '
-    '"(Get-Content uup_download_windows.cmd) '
-    "-replace 'goto :DOWNLOAD_UUPS & exit /b 1', 'goto :DOWNLOAD_UUPS' "
-    '| Set-Content uup_download_windows.cmd"'
+    'powershell -NoProfile -Command "$c='
+    "[IO.File]::ReadAllText('uup_download_windows.cmd');"
+    + "".join(
+        "$c=$c -replace '"
+        + _batch_escape(pattern)
+        + "','"
+        + _batch_escape(replacement)
+        + "';"
+        for pattern, replacement in _PS_REPLACES
+    )
+    + "[IO.File]::WriteAllText('uup_download_windows.cmd',$c)\""
 )
 
 

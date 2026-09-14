@@ -167,8 +167,8 @@ def test_uup_wizard_flow():
     assert "\n" in build_step["run"], "Build ISO 应该是多行命令"
     assert "uup_download_windows.cmd" in build_step["run"]
     assert "env.UUP_DIR" in build_step["run"]
-    assert "Set-Content uup_download_windows.cmd" in build_step["run"], "默认序列必须含 cmd 补丁"
-    print("  Build ISO 多行命令正确（含 cmd 补丁）✓")
+    assert "WriteAllText" in build_step["run"], "默认序列必须含 cmd 运行时补丁"
+    print("  Build ISO 多行命令正确（含运行时补丁）✓")
 
     # 验证 package-7z 包含 1950m 分卷
     pkg_step = next(s for s in steps0 if s["name"] == "Package")
@@ -509,7 +509,12 @@ def test_step_template_render():
     assert s["shell"] == "cmd", "build 必须声明 shell: cmd"
     assert "uup_download_windows.cmd" in s["run"]
     assert "${{ env.UUP_DIR }}" in s["run"]
-    print("  ✓ build: shell=cmd + uup_download_windows.cmd")
+    # 验证 CI 运行时补丁：死代码修复 + 超时参数 + 失败重试
+    assert "WriteAllText" in s["run"], "build 必须含 cmd 补丁（WriteAllText 幂等写回）"
+    assert "goto :DOWNLOAD_UUPS & exit /b 1" in s["run"], "补丁必须匹配原始死代码行"
+    assert "--timeout=30 --max-tries=5 --retry-wait=5" in s["run"], "补丁必须含超时参数"
+    assert "goto :DOWNLOAD_APPS" in s["run"], "补丁必须含 Store Apps 获取重试"
+    print("  ✓ build: shell=cmd + uup_download_windows.cmd + 运行时补丁")
 
     # package
     s = by_id["package"].render()
