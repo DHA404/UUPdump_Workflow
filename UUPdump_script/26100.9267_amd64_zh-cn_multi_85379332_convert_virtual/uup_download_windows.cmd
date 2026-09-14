@@ -79,8 +79,8 @@ echo.
 
 :DOWNLOAD_APPS
 echo Retrieving aria2 script for Microsoft Store Apps...
-"%aria2%" --no-conf --async-dns=false --console-log-level=warn --log-level=info --log="aria2_download.log" -o"%aria2Script%" --allow-overwrite=true --auto-file-renaming=false "https://uupdump.net/get.php?id=85379332-7c4a-4966-9fa5-4c48a7b934f1&pack=neutral&edition=app&aria2=2"
-if %ERRORLEVEL% GTR 0 call :DOWNLOAD_ERROR & exit /b 1
+"%aria2%" --no-conf --async-dns=false --console-log-level=warn --log-level=info --log="aria2_download.log" --timeout=30 --max-tries=5 --retry-wait=5 -o"%aria2Script%" --allow-overwrite=true --auto-file-renaming=false "https://uupdump.net/get.php?id=85379332-7c4a-4966-9fa5-4c48a7b934f1&pack=neutral&edition=app&aria2=2"
+if %ERRORLEVEL% GTR 0 goto :DOWNLOAD_APPS
 echo.
 
 for /F "tokens=2 delims=:" %%i in ('findstr #UUPDUMP_ERROR: "%aria2Script%"') do set DETECTED_ERROR=%%i
@@ -99,8 +99,8 @@ echo.
 
 :DOWNLOAD_UUPS
 echo Retrieving aria2 script for the UUP set...
-"%aria2%" --no-conf --async-dns=false --console-log-level=warn --log-level=info --log="aria2_download.log" -o"%aria2Script%" --allow-overwrite=true --auto-file-renaming=false "https://uupdump.net/get.php?id=85379332-7c4a-4966-9fa5-4c48a7b934f1&pack=zh-cn&edition=professional%%3Bcorecountryspecific%%3Bcore&aria2=2"
-if %ERRORLEVEL% GTR 0 call :DOWNLOAD_ERROR & exit /b 1
+"%aria2%" --no-conf --async-dns=false --console-log-level=warn --log-level=info --log="aria2_download.log" --timeout=30 --max-tries=5 --retry-wait=5 -o"%aria2Script%" --allow-overwrite=true --auto-file-renaming=false "https://uupdump.net/get.php?id=85379332-7c4a-4966-9fa5-4c48a7b934f1&pack=zh-cn&edition=professional%%3Bcorecountryspecific%%3Bcore&aria2=2"
+if %ERRORLEVEL% GTR 0 goto :DOWNLOAD_UUPS
 echo.
 
 for /F "tokens=2 delims=:" %%i in ('findstr #UUPDUMP_ERROR: "%aria2Script%"') do set DETECTED_ERROR=%%i

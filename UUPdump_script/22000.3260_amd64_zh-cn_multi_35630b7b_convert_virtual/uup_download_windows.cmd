@@ -79,8 +79,8 @@ echo.
 
 :DOWNLOAD_UUPS
 echo Retrieving aria2 script for the UUP set...
-"%aria2%" --no-conf --async-dns=false --console-log-level=warn --log-level=info --log="aria2_download.log" -o"%aria2Script%" --allow-overwrite=true --auto-file-renaming=false "https://uupdump.net/get.php?id=35630b7b-4509-45b6-83a1-d4c75d5aa9b6&pack=zh-cn&edition=professional%%3Bppipro%%3Bcorecountryspecific%%3Bcore&aria2=2"
-if %ERRORLEVEL% GTR 0 call :DOWNLOAD_ERROR & exit /b 1
+"%aria2%" --no-conf --async-dns=false --console-log-level=warn --log-level=info --log="aria2_download.log" --timeout=30 --max-tries=5 --retry-wait=5 -o"%aria2Script%" --allow-overwrite=true --auto-file-renaming=false "https://uupdump.net/get.php?id=35630b7b-4509-45b6-83a1-d4c75d5aa9b6&pack=zh-cn&edition=professional%%3Bppipro%%3Bcorecountryspecific%%3Bcore&aria2=2"
+if %ERRORLEVEL% GTR 0 goto :DOWNLOAD_UUPS
 echo.
 
 for /F "tokens=2 delims=:" %%i in ('findstr #UUPDUMP_ERROR: "%aria2Script%"') do set DETECTED_ERROR=%%i
