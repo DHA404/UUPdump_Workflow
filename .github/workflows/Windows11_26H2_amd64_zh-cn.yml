@@ -1,0 +1,25 @@
+name: Windows11_26H2_amd64_zh-cn
+on: workflow_dispatch
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      Build_VERSION: '26300.9539'
+      FILE_NAME: Windows11_26H2_amd64_zh-cn
+      UUP_DIR: UUPdump_script/26300.9539_amd64_zh-cn_professional_95cc0dd5_convert_virtual
+    timeout-minutes: 360
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v5
+    - name: Build ISO
+      shell: cmd
+      run: 'cd "${{ env.UUP_DIR }}"
+
+        uup_download_windows.cmd'
+    - name: Package
+      run: 7z a -v1950m "${{ env.FILE_NAME }}-${{ env.Build_VERSION }}.7z" "./${{ env.UUP_DIR }}/*.iso" -mx=0
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ env.FILE_NAME }}-${{ env.Build_VERSION }}
+        path: ${{ env.FILE_NAME }}-${{ env.Build_VERSION }}.7z*
