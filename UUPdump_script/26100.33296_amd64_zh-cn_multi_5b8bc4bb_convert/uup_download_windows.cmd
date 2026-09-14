@@ -79,7 +79,7 @@ echo.
 
 :DOWNLOAD_UUPS
 echo Retrieving aria2 script for the UUP set...
-"%aria2%" --no-conf --async-dns=false --console-log-level=warn --log-level=info --log="aria2_download.log" --timeout=30 --max-tries=5 --retry-wait=5 -o"%aria2Script%" --allow-overwrite=true --auto-file-renaming=false "https://uupdump.net/get.php?id=5b8bc4bb-5cd8-490b-9151-0259788568ae&pack=zh-cn&edition=serverdatacenter%%3Bserverdatacentercore%%3Bserverturbine%%3Bserverturbinecore%%3Bserverstandard%%3Bserverstandardcore&aria2=2"
+"%aria2%" --no-conf --async-dns=false --console-log-level=warn --log-level=info --log="aria2_download.log" -o"%aria2Script%" --timeout=30 --max-tries=5 --retry-wait=5 --allow-overwrite=true --auto-file-renaming=false "https://uupdump.net/get.php?id=5b8bc4bb-5cd8-490b-9151-0259788568ae&pack=zh-cn&edition=serverdatacenter%%3Bserverdatacentercore%%3Bserverturbine%%3Bserverturbinecore%%3Bserverstandard%%3Bserverstandardcore&aria2=2"
 if %ERRORLEVEL% GTR 0 goto :DOWNLOAD_UUPS
 echo.
 

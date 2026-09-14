@@ -79,7 +79,7 @@ echo.
 
 :DOWNLOAD_APPS
 echo Retrieving aria2 script for Microsoft Store Apps...
-"%aria2%" --no-conf --async-dns=false --console-log-level=warn --log-level=info --log="aria2_download.log" --timeout=30 --max-tries=5 --retry-wait=5 -o"%aria2Script%" --allow-overwrite=true --auto-file-renaming=false "https://uupdump.net/get.php?id=3918c293-2ddf-43f2-ae3c-a97fc9b9a9c1&pack=neutral&edition=app&aria2=2"
+"%aria2%" --no-conf --async-dns=false --console-log-level=warn --log-level=info --log="aria2_download.log" -o"%aria2Script%" --timeout=30 --max-tries=5 --retry-wait=5 --allow-overwrite=true --auto-file-renaming=false "https://uupdump.net/get.php?id=3918c293-2ddf-43f2-ae3c-a97fc9b9a9c1&pack=neutral&edition=app&aria2=2"
 if %ERRORLEVEL% GTR 0 goto :DOWNLOAD_APPS
 echo.
 
@@ -99,7 +99,7 @@ echo.
 
 :DOWNLOAD_UUPS
 echo Retrieving aria2 script for the UUP set...
-"%aria2%" --no-conf --async-dns=false --console-log-level=warn --log-level=info --log="aria2_download.log" --timeout=30 --max-tries=5 --retry-wait=5 -o"%aria2Script%" --allow-overwrite=true --auto-file-renaming=false "https://uupdump.net/get.php?id=3918c293-2ddf-43f2-ae3c-a97fc9b9a9c1&pack=zh-cn&edition=professional%%3Bcorecountryspecific%%3Bcore&aria2=2"
+"%aria2%" --no-conf --async-dns=false --console-log-level=warn --log-level=info --log="aria2_download.log" -o"%aria2Script%" --timeout=30 --max-tries=5 --retry-wait=5 --allow-overwrite=true --auto-file-renaming=false "https://uupdump.net/get.php?id=3918c293-2ddf-43f2-ae3c-a97fc9b9a9c1&pack=zh-cn&edition=professional%%3Bcorecountryspecific%%3Bcore&aria2=2"
 if %ERRORLEVEL% GTR 0 goto :DOWNLOAD_UUPS
 echo.
 

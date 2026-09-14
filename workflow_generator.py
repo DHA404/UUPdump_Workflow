@@ -374,9 +374,10 @@ _PS_REPLACES = [
         "--timeout=30 --max-tries=5 --retry-wait=5 "
         "--allow-overwrite=true --auto-file-renaming=false",
     ),
-    # 3) Store Apps 脚本获取失败 → 自动重试（上下文环视精确定位）
+    # 3) Store Apps 脚本获取失败 → 自动重试（上下文环视精确定位；
+    #    URL 行以引号结尾，用 \x22 表示引号以规避 cmd 引号冲突）
     (
-        r"(?<=edition=app&aria2=2\r?\n)"
+        r"(?<=edition=app&aria2=2\x22\r?\n)"
         "if %ERRORLEVEL% GTR 0 call :DOWNLOAD_ERROR & exit /b 1",
         "if %ERRORLEVEL% GTR 0 goto :DOWNLOAD_APPS",
     ),
