@@ -167,7 +167,8 @@ def test_uup_wizard_flow():
     assert "\n" in build_step["run"], "Build ISO 应该是多行命令"
     assert "uup_download_windows.cmd" in build_step["run"]
     assert "env.UUP_DIR" in build_step["run"]
-    print("  Build ISO 多行命令正确 ✓")
+    assert "Set-Content uup_download_windows.cmd" in build_step["run"], "默认序列必须含 cmd 补丁"
+    print("  Build ISO 多行命令正确（含 cmd 补丁）✓")
 
     # 验证 package-7z 包含 1950m 分卷
     pkg_step = next(s for s in steps0 if s["name"] == "Package")

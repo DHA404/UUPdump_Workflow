@@ -350,6 +350,31 @@ class ScriptDetector:
 
 
 # ============================================================
+# Build ISO 步骤的 run 命令构造
+# ============================================================
+# UUP dump 官方生成的 uup_download_windows.cmd 存在 cmd 缺陷：
+#   if %ERRORLEVEL% GTR 0 goto :DOWNLOAD_UUPS & exit /b 1
+# 其中 goto 立即跳转不返回，& 后的 exit /b 1 是死代码（IDE 静态审查会报错）。
+# 在执行官方脚本前先用 PowerShell 打补丁移除该死代码，确保 workflow 运行不受影响。
+# PowerShell 命令幂等：无缺陷时替换不生效，原样写回。
+_CMD_SCRIPT_FIX = (
+    'powershell -NoProfile -Command '
+    '"(Get-Content uup_download_windows.cmd) '
+    "-replace 'goto :DOWNLOAD_UUPS & exit /b 1', 'goto :DOWNLOAD_UUPS' "
+    '| Set-Content uup_download_windows.cmd"'
+)
+
+
+def build_iso_run() -> str:
+    """构造 Build ISO 步骤的 run 命令：cd 脚本目录 → 修复 cmd 缺陷 → 执行下载脚本"""
+    return (
+        'cd "${{ env.UUP_DIR }}"\n'
+        f"{_CMD_SCRIPT_FIX}\n"
+        "uup_download_windows.cmd"
+    )
+
+
+# ============================================================
 # StepTemplate：步骤模板，供「高级选项」中的步骤选择器使用
 # ============================================================
 @dataclass
@@ -368,10 +393,7 @@ class StepTemplate:
             return {
                 "name": "Build ISO",
                 "shell": "cmd",
-                "run": (
-                    'cd "${{ env.UUP_DIR }}"\n'
-                    "uup_download_windows.cmd"
-                ),
+                "run": build_iso_run(),
             }
         if self.id == "package":
             return {
@@ -653,10 +675,7 @@ class UUPWizard:
             {
                 "name": "Build ISO",
                 "shell": "cmd",
-                "run": (
-                    'cd "${{ env.UUP_DIR }}"\n'
-                    "uup_download_windows.cmd"
-                ),
+                "run": build_iso_run(),
             },
             {
                 "name": "Package",
