@@ -114,7 +114,7 @@ if NOT [%DETECTED_ERROR%] == [] (
 
 echo Downloading the UUP set...
 "%aria2%" --no-conf --async-dns=false --console-log-level=warn --log-level=info --log="aria2_download.log" -x16 -s16 -j5 -c -R -d"%destDir%" -i"%aria2Script%"
-if %ERRORLEVEL% GTR 0 goto :DOWNLOAD_UUPS & exit /b 1
+if %ERRORLEVEL% GTR 0 goto :DOWNLOAD_UUPS
 
 if EXIST convert-UUP.cmd goto :START_CONVERT
 pause
