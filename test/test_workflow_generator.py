@@ -379,6 +379,23 @@ def test_build_mapping():
     assert bm_resolve("26200.8968", "amd64") == "Windows11_25H2_amd64"
     print("  ✓ Win11 25H2: Windows11_25H2_amd64")
 
+    # 26H 系列：26H1 (28000) / 26H1 Insider (28020) / 26H2 (26300) / 26H2 Experimental (26340)
+    assert lookup("28000.2704") == ("Windows11", "26H1"), "Win11 26H1"
+    assert bm_resolve("28000.2704", "amd64") == "Windows11_26H1_amd64"
+    print("  ✓ Win11 26H1: Windows11_26H1_amd64")
+
+    assert lookup("28020.2904") == ("Windows11", "26H1"), "Win11 26H1 Insider"
+    assert bm_resolve("28020.2904", "amd64") == "Windows11_26H1_amd64"
+    print("  ✓ Win11 26H1 Insider (28020): Windows11_26H1_amd64")
+
+    assert lookup("26300.9278") == ("Windows11", "26H2"), "Win11 26H2"
+    assert bm_resolve("26300.9278", "amd64") == "Windows11_26H2_amd64"
+    print("  ✓ Win11 26H2: Windows11_26H2_amd64")
+
+    assert lookup("26340.9482") == ("Windows11", "26H2"), "Win11 26H2 Experimental"
+    assert bm_resolve("26340.9482", "amd64") == "Windows11_26H2_amd64"
+    print("  ✓ Win11 26H2 Experimental (26340): Windows11_26H2_amd64")
+
     # Win11 24H2 / Server 2025 (Build 26100 多候选)
     assert lookup("26100.8313") == ("Windows11", "24H2"), "Win11 24H2 default"
     assert bm_resolve("26100.8313", "amd64") == "Windows11_24H2_amd64"

@@ -30,7 +30,9 @@ BUILD_MAP: Dict[int, Union[Tuple[str, str], List[Tuple[str, str]]]] = {
     26100: [("Windows11", "24H2"), ("WindowsServer2025", "")],
     26200: ("Windows11", "25H2"),
     26300: ("Windows11", "26H2"),
+    26340: ("Windows11", "26H2"),   # 26H2 Experimental（26300 + eKB 递增）
     28000: ("Windows11", "26H1"),
+    28020: ("Windows11", "26H1"),   # 26H1 Insider/Experimental（28000 + eKB 递增）
     # ── Windows 10 ──
     10240: ("Windows10", "1507"),
     10586: ("Windows10", "1511"),
