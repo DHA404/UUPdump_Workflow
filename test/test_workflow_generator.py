@@ -496,10 +496,10 @@ def test_step_template_render():
     # package
     s = by_id["package"].render()
     assert s["name"] == "Package"
-    assert " -mx=9" in s["run"], "package 必须含 -mx=9"
+    assert " -mx=0" in s["run"], "package 必须含 -mx=0（仅存储分卷，加速解压）"
     assert " -v1950m " in s["run"], "package 必须含 -v1950m"
     assert "${{ env.Build_VERSION }}" in s["run"]
-    print("  ✓ package: -v1950m ... -mx=9")
+    print("  ✓ package: -v1950m ... -mx=0")
 
     # upload
     s = by_id["upload"].render()
@@ -563,7 +563,7 @@ def test_build_steps_with_advanced_selected():
     assert len(steps) == 3, f"expected 3 steps, got {len(steps)}"
     assert steps[0]["uses"] == "actions/checkout@v5"
     assert steps[1]["shell"] == "cmd"
-    assert " -mx=9" in steps[2]["run"]
+    assert " -mx=0" in steps[2]["run"]
     print(f"  ✓ 高级模式+3 模板: {len(steps)} 步 (checkout/build/package)")
 
     # 2. 高级模式 + 空选择 → 走默认 4 步
@@ -861,7 +861,7 @@ def test_yml_builder_with_uup_dir():
                 "name": "Package",
                 "run": (
                     '7z a -v1950m "${{ env.FILE_NAME }}-${{ env.Build_VERSION }}.7z" '
-                    '"./${{ env.UUP_DIR }}/*.iso" -mx=9'
+                    '"./${{ env.UUP_DIR }}/*.iso" -mx=0'
                 ),
             },
         ],
@@ -883,7 +883,7 @@ def test_yml_builder_with_uup_dir():
     assert "uup_download_windows.cmd" in build_step["run"]
     pkg_step = next(s for s in steps if s["name"] == "Package")
     assert "UUP_DIR" in pkg_step["run"], "7z 步骤必须使用 UUP_DIR"
-    assert "-mx=9" in pkg_step["run"]
+    assert "-mx=0" in pkg_step["run"]
     print("  [OK] UUP_DIR env + 步骤引用全部正确")
 
 

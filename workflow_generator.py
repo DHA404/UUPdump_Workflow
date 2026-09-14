@@ -380,7 +380,7 @@ class StepTemplate:
                     '7z a -v1950m "${{ env.FILE_NAME }}-'
                     '${{ env.Build_VERSION }}.7z" '
                     '"./${{ env.UUP_DIR }}/*.iso"'
-                    ' -mx=9'
+                    ' -mx=0'
                 ),
             }
         if self.id == "upload":
@@ -412,7 +412,7 @@ class StepTemplate:
         return [
             StepTemplate("checkout", "拉取代码", "actions/checkout@v5", 1),
             StepTemplate("build",    "构建 ISO", "shell: cmd + uup_download_windows.cmd", 2),
-            StepTemplate("package",  "7z 分卷压缩", "7z a -v1950m ... -mx=9", 3),
+            StepTemplate("package",  "7z 分卷压缩", "7z a -v1950m ... -mx=0", 3),
             StepTemplate("upload",   "上传工作流产物", "actions/upload-artifact@v4", 4),
             StepTemplate("release",  "发布到 GitHub Release", "softprops/action-gh-release@v2", 5),
             StepTemplate("custom",   "自定义步骤", "手动输入 uses / run / shell", 6),
@@ -664,7 +664,7 @@ class UUPWizard:
                     '7z a -v1950m "${{ env.FILE_NAME }}-'
                     '${{ env.Build_VERSION }}.7z" '
                     '"./${{ env.UUP_DIR }}/*.iso"'
-                    ' -mx=9'
+                    ' -mx=0'
                 ),
             },
         ]

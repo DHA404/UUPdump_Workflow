@@ -25,7 +25,7 @@ b.add_job(
             "name": "Package",
             "run": (
                 '7z a -v1950m "${{ env.FILE_NAME }}-${{ env.Build_VERSION }}.7z" '
-                '"./${{ env.UUP_DIR }}/*.iso" -mx=9'
+                '"./${{ env.UUP_DIR }}/*.iso" -mx=0'
             ),
         },
         {
