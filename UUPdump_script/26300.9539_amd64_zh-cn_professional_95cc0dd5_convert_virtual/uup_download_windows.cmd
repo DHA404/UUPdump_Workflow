@@ -1,5 +1,5 @@
 @echo off
-:: Generated on 2026-09-14 12:37:35 GMT
+:: Generated on 2026-09-15 02:10:58 GMT
 
 :: Proxy configuration
 :: If you need to configure a proxy to be able to connect to the internet,
@@ -79,8 +79,8 @@ echo.
 
 :DOWNLOAD_APPS
 echo Retrieving aria2 script for Microsoft Store Apps...
-"%aria2%" --no-conf --async-dns=false --console-log-level=warn --log-level=info --log="aria2_download.log" -o"%aria2Script%" --timeout=30 --max-tries=5 --retry-wait=5 --allow-overwrite=true --auto-file-renaming=false "https://uupdump.net/get.php?id=95cc0dd5-949f-452e-9115-30f6c5836016&pack=neutral&edition=app&aria2=2"
-if %ERRORLEVEL% GTR 0 goto :DOWNLOAD_APPS
+"%aria2%" --no-conf --async-dns=false --console-log-level=warn --log-level=info --log="aria2_download.log" -o"%aria2Script%" --allow-overwrite=true --auto-file-renaming=false "https://uupdump.net/get.php?id=95cc0dd5-949f-452e-9115-30f6c5836016&pack=neutral&edition=app&aria2=2"
+if %ERRORLEVEL% GTR 0 call :DOWNLOAD_ERROR & exit /b 1
 echo.
 
 for /F "tokens=2 delims=:" %%i in ('findstr #UUPDUMP_ERROR: "%aria2Script%"') do set DETECTED_ERROR=%%i
@@ -99,8 +99,8 @@ echo.
 
 :DOWNLOAD_UUPS
 echo Retrieving aria2 script for the UUP set...
-"%aria2%" --no-conf --async-dns=false --console-log-level=warn --log-level=info --log="aria2_download.log" -o"%aria2Script%" --timeout=30 --max-tries=5 --retry-wait=5 --allow-overwrite=true --auto-file-renaming=false "https://uupdump.net/get.php?id=95cc0dd5-949f-452e-9115-30f6c5836016&pack=zh-cn&edition=professional&aria2=2"
-if %ERRORLEVEL% GTR 0 goto :DOWNLOAD_UUPS
+"%aria2%" --no-conf --async-dns=false --console-log-level=warn --log-level=info --log="aria2_download.log" -o"%aria2Script%" --allow-overwrite=true --auto-file-renaming=false "https://uupdump.net/get.php?id=95cc0dd5-949f-452e-9115-30f6c5836016&pack=zh-cn&edition=professional&aria2=2"
+if %ERRORLEVEL% GTR 0 call :DOWNLOAD_ERROR & exit /b 1
 echo.
 
 for /F "tokens=2 delims=:" %%i in ('findstr #UUPDUMP_ERROR: "%aria2Script%"') do set DETECTED_ERROR=%%i
@@ -114,7 +114,7 @@ if NOT [%DETECTED_ERROR%] == [] (
 
 echo Downloading the UUP set...
 "%aria2%" --no-conf --async-dns=false --console-log-level=warn --log-level=info --log="aria2_download.log" -x16 -s16 -j5 -c -R -d"%destDir%" -i"%aria2Script%"
-if %ERRORLEVEL% GTR 0 goto :DOWNLOAD_UUPS
+if %ERRORLEVEL% GTR 0 goto :DOWNLOAD_UUPS & exit /b 1
 
 if EXIST convert-UUP.cmd goto :START_CONVERT
 pause
