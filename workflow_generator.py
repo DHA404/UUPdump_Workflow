@@ -386,6 +386,17 @@ _PS_REPLACES = [
         "if %ERRORLEVEL% GTR 0 call :DOWNLOAD_ERROR & exit /b 1",
         "if %ERRORLEVEL% GTR 0 goto :DOWNLOAD_UUPS",
     ),
+    # 5) Store Apps 检索返回服务端错误（如 WU_REQUEST_FAILED，aria2 退出码仍为 0，
+    #    不会触发上方重试）时，跳过 Store Apps 继续用 UUP set 构建 ISO，
+    #    避免整个脚本 goto :EOF 而产出空包。
+    #    用正向前瞻精确定位 Store Apps 检测块末尾的 "goto :EOF"
+    #    （其右括号后紧跟空行 + "echo Downloading Microsoft Store Apps"），
+    #    不匹配 UUP set 检测块（其后是 "echo Downloading the UUP set"）。
+    #    已修复后 goto :EOF 变为 goto :DOWNLOAD_UUPS，前瞻不再命中 → 幂等。
+    (
+        r"goto :EOF(?=\r?\n[ \t]*\)[ \t]*\r?\n[ \t]*\r?\n[ \t]*echo Downloading Microsoft Store Apps)",
+        "goto :DOWNLOAD_UUPS",
+    ),
 ]
 
 

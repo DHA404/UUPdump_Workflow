@@ -514,6 +514,8 @@ def test_step_template_render():
     assert "goto :DOWNLOAD_UUPS & exit /b 1" in s["run"], "补丁必须匹配原始死代码行"
     assert "--timeout=30 --max-tries=5 --retry-wait=5" in s["run"], "补丁必须含超时参数"
     assert "goto :DOWNLOAD_APPS" in s["run"], "补丁必须含 Store Apps 获取重试"
+    # 规则5：Store Apps 检索返回服务端错误(WU_REQUEST_FAILED)时跳过并继续 UUP set
+    assert "echo Downloading Microsoft Store Apps)" in s["run"], "补丁必须含 Store Apps 失败跳过规则"
     print("  ✓ build: shell=cmd + uup_download_windows.cmd + 运行时补丁")
 
     # package
